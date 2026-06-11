@@ -44,14 +44,17 @@ export function SessionLog() {
           ) : (
             <div className="space-y-1">
               {sessions.map((session) => (
-                <div key={session.id} className="flex items-center justify-between py-3 px-2 border-b border-border/40 last:border-0 hover:bg-muted/20 rounded transition-colors">
-                  <div className="flex flex-col">
+                <div key={session.id} className="flex items-start justify-between py-3 px-2 border-b border-border/40 last:border-0 hover:bg-muted/20 rounded transition-colors">
+                  <div className="flex flex-col gap-0.5 min-w-0 pr-3">
                     <span className="font-medium text-foreground">{session.taskName}</span>
                     <span className="text-xs text-muted-foreground font-mono">
                       {format(new Date(session.completedAt), "h:mm a")} · {session.durationMinutes}m
                     </span>
+                    {session.notes && (
+                      <span className="text-xs text-muted-foreground mt-1 leading-relaxed">{session.notes}</span>
+                    )}
                   </div>
-                  <div className="text-2xl" title={session.rating || "Unrated"}>
+                  <div className="text-2xl flex-shrink-0" title={session.rating || "Unrated"}>
                     {session.rating || <span className="text-sm text-muted-foreground">...</span>}
                   </div>
                 </div>

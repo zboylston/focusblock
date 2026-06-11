@@ -76,9 +76,10 @@ router.patch("/sessions/:id", async (req, res) => {
     return;
   }
 
+  const { rating, notes } = bodyParsed.data;
   const [updated] = await db
     .update(sessionsTable)
-    .set({ rating: bodyParsed.data.rating })
+    .set({ rating, ...(notes !== undefined && { notes }) })
     .where(eq(sessionsTable.id, paramsParsed.data.id))
     .returning();
 

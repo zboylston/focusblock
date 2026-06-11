@@ -224,6 +224,9 @@ components:
         rating:
           type: ["string", "null"]
           description: "Emoji rating: 😩 | 😐 | 🙂 | 🔥"
+        notes:
+          type: ["string", "null"]
+          description: "What was worked on during this session"
 
     SessionInput:
       type: object
@@ -243,6 +246,9 @@ components:
         rating:
           type: string
           enum: ["😩", "😐", "🙂", "🔥"]
+        notes:
+          type: string
+          description: "What was worked on during this session"
 
     TodayStats:
       type: object

@@ -30,7 +30,8 @@ export const ListSessionsResponseItem = zod.object({
   "taskName": zod.string(),
   "completedAt": zod.coerce.date(),
   "durationMinutes": zod.number(),
-  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥')
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this session')
 })
 export const ListSessionsResponse = zod.array(ListSessionsResponseItem)
 
@@ -57,7 +58,8 @@ export const RateSessionParams = zod.object({
 })
 
 export const RateSessionBody = zod.object({
-  "rating": zod.enum(['😩', '😐', '🙂', '🔥'])
+  "rating": zod.enum(['😩', '😐', '🙂', '🔥']),
+  "notes": zod.string().optional().describe('What was worked on during this session')
 })
 
 export const RateSessionResponse = zod.object({
@@ -65,7 +67,8 @@ export const RateSessionResponse = zod.object({
   "taskName": zod.string(),
   "completedAt": zod.coerce.date(),
   "durationMinutes": zod.number(),
-  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥')
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this session')
 })
 
 

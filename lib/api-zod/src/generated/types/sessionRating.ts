@@ -9,4 +9,6 @@ import type { SessionRatingRating } from './sessionRatingRating';
 
 export interface SessionRating {
   rating: SessionRatingRating;
+  /** What was worked on during this session */
+  notes?: string;
 }

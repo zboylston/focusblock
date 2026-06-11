@@ -16,4 +16,9 @@ export interface Session {
      * @nullable
      */
   rating?: string | null;
+  /**
+     * What was worked on during this session
+     * @nullable
+     */
+  notes?: string | null;
 }

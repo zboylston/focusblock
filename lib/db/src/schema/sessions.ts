@@ -8,6 +8,7 @@ export const sessionsTable = pgTable("sessions", {
   completedAt: timestamp("completed_at", { withTimezone: true }).notNull().defaultNow(),
   durationMinutes: integer("duration_minutes").notNull().default(30),
   rating: text("rating"),
+  notes: text("notes"),
 });
 
 export const insertSessionSchema = createInsertSchema(sessionsTable).omit({

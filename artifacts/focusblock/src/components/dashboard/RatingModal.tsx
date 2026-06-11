@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useRateSession, getListSessionsQueryKey, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface RatingModalProps {
   sessionId: number;
@@ -8,6 +10,7 @@ interface RatingModalProps {
 }
 
 export function RatingModal({ sessionId, onComplete }: RatingModalProps) {
+  const [notes, setNotes] = useState("");
   const rateSession = useRateSession();
   const queryClient = useQueryClient();
 
@@ -15,7 +18,7 @@ export function RatingModal({ sessionId, onComplete }: RatingModalProps) {
     try {
       await rateSession.mutateAsync({
         id: sessionId,
-        data: { rating }
+        data: { rating, ...(notes.trim() && { notes: notes.trim() }) }
       });
       queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
@@ -34,7 +37,16 @@ export function RatingModal({ sessionId, onComplete }: RatingModalProps) {
             How was your focus during this block?
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-4 gap-4 mt-6">
+
+        <Textarea
+          className="mt-5 resize-none text-sm"
+          rows={3}
+          placeholder="What did you work on? (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+
+        <div className="grid grid-cols-4 gap-4 mt-4">
           <button onClick={() => handleRate("😩")} className="text-5xl hover:scale-110 transition-transform active:scale-95 bg-muted/30 rounded-2xl p-4 hover:bg-muted/60">😩</button>
           <button onClick={() => handleRate("😐")} className="text-5xl hover:scale-110 transition-transform active:scale-95 bg-muted/30 rounded-2xl p-4 hover:bg-muted/60">😐</button>
           <button onClick={() => handleRate("🙂")} className="text-5xl hover:scale-110 transition-transform active:scale-95 bg-muted/30 rounded-2xl p-4 hover:bg-muted/60">🙂</button>
