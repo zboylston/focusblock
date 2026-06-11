@@ -1,23 +1,54 @@
+let ctx: AudioContext | null = null;
+
+function getCtx(): AudioContext {
+  if (!ctx) {
+    ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+  return ctx;
+}
+
+export const primeAudio = () => {
+  try {
+    const c = getCtx();
+    if (c.state === "suspended") c.resume();
+  } catch (_) {}
+};
+
+const beep = (c: AudioContext, startTime: number, freq: number, duration: number) => {
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(freq, startTime);
+
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.6, startTime + 0.02);
+  gain.gain.setValueAtTime(0.6, startTime + duration - 0.05);
+  gain.gain.linearRampToValueAtTime(0, startTime + duration);
+
+  osc.connect(gain);
+  gain.connect(c.destination);
+
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+};
+
 export const playAlertTone = () => {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(440, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
-    
-    gainNode.gain.setValueAtTime(0, ctx.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 0.05);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-
-    osc.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.5);
+    const c = getCtx();
+    if (c.state === "suspended") {
+      c.resume().then(() => scheduleBeeps(c));
+    } else {
+      scheduleBeeps(c);
+    }
   } catch (err) {
     console.error("Audio playback failed", err);
   }
+};
+
+const scheduleBeeps = (c: AudioContext) => {
+  const t = c.currentTime;
+  beep(c, t,        880, 0.18);
+  beep(c, t + 0.25, 880, 0.18);
+  beep(c, t + 0.50, 1100, 0.30);
 };

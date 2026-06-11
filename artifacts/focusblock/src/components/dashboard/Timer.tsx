@@ -3,7 +3,7 @@ import { Play, Pause, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { playAlertTone } from "@/lib/audio";
+import { playAlertTone, primeAudio } from "@/lib/audio";
 import { useCreateSession, getListSessionsQueryKey, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -124,6 +124,10 @@ export function Timer({ activeTaskName, onTaskNameChange }: TimerProps) {
     if (isActive) {
       // Pausing: freeze the remaining time by dropping the target timestamp.
       endTimeRef.current = null;
+    } else {
+      // Unlock the AudioContext on the user gesture so the end-of-session
+      // alert can play even when no interaction occurs at completion time.
+      primeAudio();
     }
     setIsActive((prev) => !prev);
   };
