@@ -1,0 +1,41 @@
+Create a full-stack time-blocking and focus timer application called "FocusBlock". 
+
+Tech Stack:
+- Frontend: React, Tailwind CSS, and Lucide React (for icons)
+- Backend: Node.js with Express
+- Database: SQLite or PostgreSQL (natively supported by Replit) to permanently persist all tasks, logs, and ratings.
+
+Core Features & Logic:
+
+1. The Dynamic Timer System
+- A focus timer set to 30-minute intervals and a break timer set to 5-minute intervals.
+- Before starting a focus timer, the user must be able to input a name/label for their current focus.
+- When the 30-minute focus timer hits zero:
+  * Trigger a soft audio alert/chime.
+  * Flash the browser tab title (e.g., "🚨 Session Complete! 🚨") to get the user's attention.
+  * Open a custom modal popup asking the user to rate their focus (see Section 4).
+  * Automatically queue up and prompt the user to start the 5-minute break timer.
+
+2. Daily Planner & Time Budgeting
+- A "Daily Budget Planner" section where users can map out future 30-minute chunks.
+- Users can input a task name and specify how many 30-minute chunks to budget for it.
+- CRUCIAL LOGIC: If a user adds "Onboarding" with 3 chunks, the app must create 3 distinct, individual rows/items in the database and UI, all sharing the exact same task name "Onboarding". This allows the user to check them off one by one as they complete them.
+- Users should be able to click on any uncompleted task in this planner to automatically populate the active timer's focus input field.
+
+3. Live 5:00 PM EST Chunk Calculator
+- The app must display a dynamic metric in the header: "X Chunks left until 5 PM EST".
+- Use the standard Intl.DateTimeFormat API to robustly calculate the exact time difference between the user's current local time and 5:00 PM Eastern Standard Time (EST), regardless of the user's local timezone settings.
+- This remaining chunk countdown must update dynamically every 60 seconds.
+
+4. Session Logging & Focus Rating System
+- When a 30-minute focus timer successfully completes, immediately save the session to a "Session Log" in the database (capturing task name, completion timestamp, and a 30-minute duration).
+- The completion modal must overlay the screen and ask: "How was your focus?". Provide 4 emoji buttons: 😩 (Distracted), 😐 (Okay), 🙂 (Good), 🔥 (Great!).
+- Once the user clicks a rating, update that specific session log item in the database with the selected emoji rating.
+- Display a "Session Log" dashboard component showing a history of all completed focus chunks for the day, including the time completed and their corresponding focus emoji.
+
+UI/UX Requirements:
+- Clean, modern, distraction-free minimalist dashboard layout.
+- Use a two-column or distinct grid layout: Timer and Session Logs on the left, Daily Budget Planner on the right.
+- Use smooth Tailwind transitions for interactive elements (hover states, checking off tasks, opening modals).
+
+Please build the entire application, set up the database tables, and ensure it runs seamlessly in the Replit preview window.

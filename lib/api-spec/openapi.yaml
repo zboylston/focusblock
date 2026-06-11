@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: FocusBlock API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: sessions
+    description: Focus session log operations
+  - name: tasks
+    description: Daily planner task operations
 paths:
   /healthz:
     get:
@@ -24,6 +28,176 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List focus sessions
+      description: Returns all focus sessions for today ordered by most recent
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+          description: ISO date string (YYYY-MM-DD) to filter sessions, defaults to today
+      responses:
+        "200":
+          description: List of focus sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a focus session
+      description: Records a completed 30-minute focus session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /sessions/{id}:
+    patch:
+      operationId: rateSession
+      tags: [sessions]
+      summary: Rate a focus session
+      description: Updates the focus rating for a completed session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionRating"
+      responses:
+        "200":
+          description: Session updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Session not found
+
+  /sessions/stats/today:
+    get:
+      operationId: getTodayStats
+      tags: [sessions]
+      summary: Get today's session stats
+      description: Returns aggregated stats for today (total sessions, ratings breakdown)
+      responses:
+        "200":
+          description: Today's stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodayStats"
+
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List daily planner tasks
+      description: Returns all tasks for today's daily planner
+      parameters:
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+          description: ISO date string (YYYY-MM-DD) to filter tasks, defaults to today
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTasks
+      tags: [tasks]
+      summary: Create planner tasks (expands chunks)
+      description: Creates one task row per chunk (e.g. 3 chunks creates 3 rows with the same name)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Tasks created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+
+  /tasks/{id}:
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task
+      description: Mark a task as completed or update its name
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdate"
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: Task not found
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Task deleted
+        "404":
+          description: Task not found
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +208,107 @@ components:
       required:
         - status
 
+    Session:
+      type: object
+      required: [id, taskName, completedAt, durationMinutes]
+      properties:
+        id:
+          type: integer
+        taskName:
+          type: string
+        completedAt:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+        rating:
+          type: ["string", "null"]
+          description: "Emoji rating: 😩 | 😐 | 🙂 | 🔥"
+
+    SessionInput:
+      type: object
+      required: [taskName]
+      properties:
+        taskName:
+          type: string
+          minLength: 1
+        durationMinutes:
+          type: integer
+          default: 30
+
+    SessionRating:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: string
+          enum: ["😩", "😐", "🙂", "🔥"]
+
+    TodayStats:
+      type: object
+      required: [totalSessions, totalMinutes, ratingsBreakdown]
+      properties:
+        totalSessions:
+          type: integer
+        totalMinutes:
+          type: integer
+        ratingsBreakdown:
+          type: object
+          properties:
+            distracted:
+              type: integer
+            okay:
+              type: integer
+            good:
+              type: integer
+            great:
+              type: integer
+          required: [distracted, okay, good, great]
+
+    Task:
+      type: object
+      required: [id, name, date, chunkIndex, totalChunks, completed, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        date:
+          type: string
+          format: date
+        chunkIndex:
+          type: integer
+          description: 1-based index within its chunk group
+        totalChunks:
+          type: integer
+        completed:
+          type: boolean
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    TaskInput:
+      type: object
+      required: [name, chunks]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        chunks:
+          type: integer
+          minimum: 1
+          maximum: 16
+        date:
+          type: string
+          format: date
+
+    TaskUpdate:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        name:
+          type: string
