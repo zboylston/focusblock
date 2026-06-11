@@ -119,11 +119,16 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
     return Array.from(byDate.entries()).map(([date, tasks]) => {
       const completedBlocks = tasks.filter((t) => t.completed).length;
       const groups = groupByName(tasks);
-      // Open groups first, fully-done groups after.
+      // Open groups first (newest-created first), fully-done groups after.
       groups.sort((a, b) => {
         const aDone = a.completedCount === a.blocks.length ? 1 : 0;
         const bDone = b.completedCount === b.blocks.length ? 1 : 0;
-        return aDone - bDone;
+        if (aDone !== bDone) return aDone - bDone;
+        // Within the same bucket, sort by creation time: newest first for open,
+        // oldest first for done (chronological log order).
+        const aTime = new Date(a.blocks[0].createdAt).getTime();
+        const bTime = new Date(b.blocks[0].createdAt).getTime();
+        return aDone === 0 ? bTime - aTime : aTime - bTime;
       });
       return {
         date,
