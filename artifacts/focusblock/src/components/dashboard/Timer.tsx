@@ -225,7 +225,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
                 placeholder="What are you focusing on?"
                 value={activeTaskName}
                 onChange={(e) => onTaskNameChange(e.target.value)}
-                className="text-center bg-transparent border-t-0 border-x-0 border-b-2 border-border/50 focus-visible:border-primary focus-visible:ring-0 rounded-none px-0 text-lg placeholder:text-muted-foreground/60 h-12"
+                className="text-center bg-transparent border-t-0 border-x-0 border-b-2 border-border/50 focus-visible:border-primary focus-visible:ring-0 rounded-none px-0 text-xl font-bold text-foreground placeholder:text-muted-foreground/50 placeholder:font-normal h-12"
                 disabled={isActive}
               />
             ) : (
