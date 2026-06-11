@@ -108,7 +108,7 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
     queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
   };
 
-  const sections: DaySection[] = useMemo(() => {
+  const { openGroups, daySections } = useMemo(() => {
     const allTasks = data?.pages.flatMap((p) => p.tasks) ?? [];
     const byDate = new Map<string, Task[]>();
     for (const t of allTasks) {
@@ -116,27 +116,35 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
       existing.push(t);
       byDate.set(t.date, existing);
     }
-    return Array.from(byDate.entries()).map(([date, tasks]) => {
+
+    const collectedOpen: TaskGroup[] = [];
+    const sections: DaySection[] = [];
+
+    for (const [date, tasks] of byDate.entries()) {
       const completedBlocks = tasks.filter((t) => t.completed).length;
       const groups = groupByName(tasks);
-      // Open groups first (newest-created first), fully-done groups after.
-      groups.sort((a, b) => {
-        const aDone = a.completedCount === a.blocks.length ? 1 : 0;
-        const bDone = b.completedCount === b.blocks.length ? 1 : 0;
-        if (aDone !== bDone) return aDone - bDone;
-        // Within the same bucket, sort by creation time: newest first for open,
-        // oldest first for done (chronological log order).
-        const aTime = new Date(a.blocks[0].createdAt).getTime();
-        const bTime = new Date(b.blocks[0].createdAt).getTime();
-        return aDone === 0 ? bTime - aTime : aTime - bTime;
-      });
-      return {
-        date,
-        groups,
-        completedBlocks,
-        minutes: completedBlocks * 30,
-      };
-    });
+
+      const pending = groups.filter((g) => g.completedCount < g.blocks.length);
+      const done = groups.filter((g) => g.completedCount === g.blocks.length);
+
+      collectedOpen.push(...pending);
+
+      // Done groups under the day divider in chronological order.
+      done.sort((a, b) =>
+        new Date(a.blocks[0].createdAt).getTime() - new Date(b.blocks[0].createdAt).getTime()
+      );
+
+      if (completedBlocks > 0) {
+        sections.push({ date, groups: done, completedBlocks, minutes: completedBlocks * 30 });
+      }
+    }
+
+    // Open tasks float above all day dividers, newest-added first.
+    collectedOpen.sort((a, b) =>
+      new Date(b.blocks[0].createdAt).getTime() - new Date(a.blocks[0].createdAt).getTime()
+    );
+
+    return { openGroups: collectedOpen, daySections: sections };
   }, [data]);
 
   const handleAddTask = async (e: React.FormEvent) => {
@@ -176,6 +184,16 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
     }
   };
 
+  const handleCompleteAll = async (group: TaskGroup) => {
+    const openBlocks = group.blocks.filter((b) => !b.completed);
+    try {
+      await Promise.all(openBlocks.map((b) => updateTask.mutateAsync({ id: b.id, data: { completed: true } })));
+      refresh();
+    } catch (err) {
+      console.error("Failed to complete group", err);
+    }
+  };
+
   const handleDeleteGroup = async (blocks: Task[]) => {
     try {
       await Promise.all(blocks.map((b) => deleteTask.mutateAsync({ id: b.id })));
@@ -202,7 +220,7 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const isEmpty = !isLoading && sections.length === 0;
+  const isEmpty = !isLoading && openGroups.length === 0 && daySections.length === 0;
 
   return (
     <section className="flex flex-col gap-8">
@@ -264,37 +282,51 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
         </div>
       ) : (
         <div className="flex flex-col gap-10">
-          {sections.map((section) => (
+          {/* Open tasks — float above all date dividers, newest first */}
+          {openGroups.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {openGroups.map((group) => (
+                <TimelineGroup
+                  key={group.blocks[0].id}
+                  group={group}
+                  onToggleBlock={handleToggleBlock}
+                  onPlay={handlePlay}
+                  onCompleteAll={handleCompleteAll}
+                  onDelete={handleDeleteGroup}
+                  onSelect={onTaskSelect}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Completed blocks organised by day */}
+          {daySections.map((section) => (
             <div key={section.date} className="flex flex-col gap-5">
-              {/* Date divider */}
               <div className="flex items-center gap-4">
                 <h2 className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground/80 whitespace-nowrap">
                   {dayLabel(section.date)}
                 </h2>
                 <div className="h-px flex-1 bg-border/60" />
                 <span className="text-xs text-muted-foreground/70 whitespace-nowrap tabular-nums">
-                  {section.completedBlocks > 0 ? (
-                    <>
-                      {section.completedBlocks} {section.completedBlocks === 1 ? "block" : "blocks"} · {section.minutes} min
-                    </>
-                  ) : (
-                    "No focus logged"
-                  )}
+                  {section.completedBlocks} {section.completedBlocks === 1 ? "block" : "blocks"} · {section.minutes} min
                 </span>
               </div>
 
-              <div className="flex flex-col gap-1">
-                {section.groups.map((group) => (
-                  <TimelineGroup
-                    key={group.name}
-                    group={group}
-                    onToggleBlock={handleToggleBlock}
-                    onPlay={handlePlay}
-                    onDelete={handleDeleteGroup}
-                    onSelect={onTaskSelect}
-                  />
-                ))}
-              </div>
+              {section.groups.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {section.groups.map((group) => (
+                    <TimelineGroup
+                      key={group.blocks[0].id}
+                      group={group}
+                      onToggleBlock={handleToggleBlock}
+                      onPlay={handlePlay}
+                      onCompleteAll={handleCompleteAll}
+                      onDelete={handleDeleteGroup}
+                      onSelect={onTaskSelect}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           ))}
 
@@ -313,11 +345,12 @@ interface TimelineGroupProps {
   group: TaskGroup;
   onToggleBlock: (block: Task) => void;
   onPlay: (group: TaskGroup) => void;
+  onCompleteAll: (group: TaskGroup) => void;
   onDelete: (blocks: Task[]) => void;
   onSelect: (name: string) => void;
 }
 
-function TimelineGroup({ group, onToggleBlock, onPlay, onDelete, onSelect }: TimelineGroupProps) {
+function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onDelete, onSelect }: TimelineGroupProps) {
   const allDone = group.completedCount === group.blocks.length;
   const hasPending = !allDone;
   const overEstimate = group.completedCount > group.totalEstimated;
@@ -378,15 +411,26 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onDelete, onSelect }: Tim
         </div>
 
         {hasPending && (
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Start a 30-min focus block for this task"
-            className="flex-shrink-0 text-primary hover:text-primary hover:bg-primary/10"
-            onClick={() => onPlay(group)}
-          >
-            <Play className="w-4 h-4 fill-current" />
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Mark all done"
+              className="flex-shrink-0 text-muted-foreground/40 hover:text-primary hover:bg-primary/10"
+              onClick={() => onCompleteAll(group)}
+            >
+              <Check className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Start a 30-min focus block for this task"
+              className="flex-shrink-0 text-primary hover:text-primary hover:bg-primary/10"
+              onClick={() => onPlay(group)}
+            >
+              <Play className="w-4 h-4 fill-current" />
+            </Button>
+          </>
         )}
 
         <Button
