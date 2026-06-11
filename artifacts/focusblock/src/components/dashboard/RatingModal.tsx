@@ -31,7 +31,7 @@ export function RatingModal({ sessionId, onComplete }: RatingModalProps) {
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold mb-2">Session Complete!</DialogTitle>
           <DialogDescription className="text-base">
-            How was your focus during this chunk?
+            How was your focus during this block?
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-4 gap-4 mt-6">

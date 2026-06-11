@@ -104,7 +104,7 @@ export function DailyPlanner({ onTaskSelect }: DailyPlannerProps) {
               <Plus className="w-6 h-6 text-muted-foreground/50" />
             </div>
             <p className="font-medium text-foreground mb-1">Your planner is empty</p>
-            <p className="text-sm">Add a task above to start planning your day. Break big tasks into 30-minute chunks.</p>
+            <p className="text-sm">Add a task above to start planning your day. Break big tasks into 30-minute work blocks.</p>
           </div>
         ) : (
           <div className="divide-y divide-border/40">
@@ -132,7 +132,7 @@ export function DailyPlanner({ onTaskSelect }: DailyPlannerProps) {
                     {task.name}
                   </span>
                   <span className="text-xs text-muted-foreground font-mono mt-0.5">
-                    Chunk {task.chunkIndex} of {task.totalChunks}
+                    Block {task.chunkIndex} of {task.totalChunks}
                   </span>
                 </div>
 

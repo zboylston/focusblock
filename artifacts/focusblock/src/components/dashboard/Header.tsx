@@ -40,7 +40,7 @@ export function Header() {
       </div>
       <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1.5 rounded-full flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-primary/80 animate-pulse"></div>
-        {chunksLeft} chunks left until 5 PM EST
+        {chunksLeft} work blocks left until 5 PM EST
       </div>
     </header>
   );
