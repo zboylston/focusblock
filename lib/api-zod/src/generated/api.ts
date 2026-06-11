@@ -18,99 +18,6 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * Returns all focus sessions for today ordered by most recent
- * @summary List focus sessions
- */
-export const ListSessionsQueryParams = zod.object({
-  "date": zod.coerce.string().optional().describe('ISO date string (YYYY-MM-DD) to filter sessions, defaults to today')
-})
-
-export const ListSessionsResponseItem = zod.object({
-  "id": zod.number(),
-  "taskName": zod.string(),
-  "completedAt": zod.coerce.date(),
-  "durationMinutes": zod.number(),
-  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
-  "notes": zod.string().nullish().describe('What was worked on during this session')
-})
-export const ListSessionsResponse = zod.array(ListSessionsResponseItem)
-
-
-/**
- * Records a completed 30-minute focus session
- * @summary Create a focus session
- */
-
-export const createSessionBodyDurationMinutesDefault = 30;
-
-export const CreateSessionBody = zod.object({
-  "taskName": zod.string().min(1),
-  "durationMinutes": zod.number().default(createSessionBodyDurationMinutesDefault)
-})
-
-
-/**
- * Updates the focus rating for a completed session
- * @summary Rate a focus session
- */
-export const RateSessionParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const RateSessionBody = zod.object({
-  "rating": zod.enum(['😩', '😐', '🙂', '🔥']),
-  "notes": zod.string().optional().describe('What was worked on during this session')
-})
-
-export const RateSessionResponse = zod.object({
-  "id": zod.number(),
-  "taskName": zod.string(),
-  "completedAt": zod.coerce.date(),
-  "durationMinutes": zod.number(),
-  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
-  "notes": zod.string().nullish().describe('What was worked on during this session')
-})
-
-
-/**
- * Returns aggregated stats for today (total sessions, ratings breakdown)
- * @summary Get today's session stats
- */
-export const GetTodayStatsResponse = zod.object({
-  "totalSessions": zod.number(),
-  "totalMinutes": zod.number(),
-  "ratingsBreakdown": zod.object({
-  "distracted": zod.number(),
-  "okay": zod.number(),
-  "good": zod.number(),
-  "great": zod.number()
-})
-})
-
-
-/**
- * Returns all tasks for today's daily planner
- * @summary List daily planner tasks
- */
-export const ListTasksQueryParams = zod.object({
-  "date": zod.coerce.string().optional().describe('ISO date string (YYYY-MM-DD) to filter tasks, defaults to today')
-})
-
-export const ListTasksResponseItem = zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
-  "date": zod.coerce.date(),
-  "chunkIndex": zod.number().describe('1-based index within its block group'),
-  "totalChunks": zod.number(),
-  "completed": zod.boolean(),
-  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
-  "completedAt": zod.coerce.date().nullish(),
-  "createdAt": zod.coerce.date()
-})
-export const ListTasksResponse = zod.array(ListTasksResponseItem)
-
-
-/**
  * Creates one task row per chunk (e.g. 3 chunks creates 3 rows with the same name)
  * @summary Create planner tasks (expands chunks)
  */
@@ -127,7 +34,76 @@ export const CreateTasksBody = zod.object({
 
 
 /**
- * Mark a task as completed or update its name
+ * Returns tasks grouped-ready for the timeline, newest day first, a page of days at a time. Pass the previous page's nextCursor as `before` to load older days.
+ * @summary Paginated timeline of tasks across days
+ */
+export const getTimelineQueryLimitDefault = 7;
+export const getTimelineQueryLimitMax = 31;
+
+
+
+export const GetTimelineQueryParams = zod.object({
+  "before": zod.date().optional().describe('Only return days strictly before this calendar date (YYYY-MM-DD)'),
+  "limit": zod.coerce.number().min(1).max(getTimelineQueryLimitMax).default(getTimelineQueryLimitDefault).describe('Number of distinct days to return in this page')
+})
+
+export const GetTimelineResponse = zod.object({
+  "tasks": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "date": zod.coerce.date(),
+  "chunkIndex": zod.number().describe('1-based index within its block group'),
+  "totalChunks": zod.number(),
+  "completed": zod.boolean(),
+  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this block'),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "nextCursor": zod.coerce.date().nullish().describe('Pass as `before` to load the next (older) page; null when no older days exist'),
+  "hasMore": zod.boolean()
+})
+
+
+/**
+ * Returns aggregated stats for today (completed blocks and minutes focused)
+ * @summary Get today's focus stats
+ */
+export const GetTodayStatsResponse = zod.object({
+  "totalBlocks": zod.number(),
+  "totalMinutes": zod.number()
+})
+
+
+/**
+ * Marks the next open block for the given name (today) as done. If no open block exists, a new completed block is created for today. Returns the completed task so the caller can attach a rating.
+ * @summary Complete a focus block for a task by name
+ */
+
+
+
+export const CompleteFocusBody = zod.object({
+  "name": zod.string().min(1)
+})
+
+export const CompleteFocusResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "date": zod.coerce.date(),
+  "chunkIndex": zod.number().describe('1-based index within its block group'),
+  "totalChunks": zod.number(),
+  "completed": zod.boolean(),
+  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this block'),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * Mark a task done, rename it, attach a rating/notes, or adjust plays
  * @summary Update a task
  */
 export const UpdateTaskParams = zod.object({
@@ -142,6 +118,8 @@ export const updateTaskBodyPlaysMin = 0;
 export const UpdateTaskBody = zod.object({
   "completed": zod.boolean().optional(),
   "name": zod.string().optional(),
+  "rating": zod.enum(['😩', '😐', '🙂', '🔥']).optional(),
+  "notes": zod.string().optional().describe('What was worked on during this block'),
   "plays": zod.number().min(updateTaskBodyPlaysMin).optional(),
   "incrementPlays": zod.number().min(1).optional().describe('Atomically add this many plays to the current value')
 })
@@ -154,6 +132,8 @@ export const UpdateTaskResponse = zod.object({
   "totalChunks": zod.number(),
   "completed": zod.boolean(),
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })

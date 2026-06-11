@@ -6,9 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListTasksParams = {
-/**
- * ISO date string (YYYY-MM-DD) to filter tasks, defaults to today
- */
-date?: string;
-};
+export interface CompleteFocusInput {
+  /** @minLength 1 */
+  name: string;
+}

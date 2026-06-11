@@ -10,10 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
-  - name: sessions
-    description: Focus session log operations
   - name: tasks
-    description: Daily planner task operations
+    description: Focus block / timeline operations
 paths:
   /healthz:
     get:
@@ -29,111 +27,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
-  /sessions:
-    get:
-      operationId: listSessions
-      tags: [sessions]
-      summary: List focus sessions
-      description: Returns all focus sessions for today ordered by most recent
-      parameters:
-        - name: date
-          in: query
-          required: false
-          schema:
-            type: string
-          description: ISO date string (YYYY-MM-DD) to filter sessions, defaults to today
-      responses:
-        "200":
-          description: List of focus sessions
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Session"
-    post:
-      operationId: createSession
-      tags: [sessions]
-      summary: Create a focus session
-      description: Records a completed 30-minute focus session
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SessionInput"
-      responses:
-        "201":
-          description: Session created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Session"
-
-  /sessions/{id}:
-    patch:
-      operationId: rateSession
-      tags: [sessions]
-      summary: Rate a focus session
-      description: Updates the focus rating for a completed session
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SessionRating"
-      responses:
-        "200":
-          description: Session updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Session"
-        "404":
-          description: Session not found
-
-  /sessions/stats/today:
-    get:
-      operationId: getTodayStats
-      tags: [sessions]
-      summary: Get today's session stats
-      description: Returns aggregated stats for today (total sessions, ratings breakdown)
-      responses:
-        "200":
-          description: Today's stats
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TodayStats"
-
   /tasks:
-    get:
-      operationId: listTasks
-      tags: [tasks]
-      summary: List daily planner tasks
-      description: Returns all tasks for today's daily planner
-      parameters:
-        - name: date
-          in: query
-          required: false
-          schema:
-            type: string
-          description: ISO date string (YYYY-MM-DD) to filter tasks, defaults to today
-      responses:
-        "200":
-          description: List of tasks
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Task"
     post:
       operationId: createTasks
       tags: [tasks]
@@ -155,12 +49,83 @@ paths:
                 items:
                   $ref: "#/components/schemas/Task"
 
+  /tasks/timeline:
+    get:
+      operationId: getTimeline
+      tags: [tasks]
+      summary: Paginated timeline of tasks across days
+      description: >-
+        Returns tasks grouped-ready for the timeline, newest day first, a page
+        of days at a time. Pass the previous page's nextCursor as `before` to
+        load older days.
+      parameters:
+        - name: before
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Only return days strictly before this calendar date (YYYY-MM-DD)
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 31
+            default: 7
+          description: Number of distinct days to return in this page
+      responses:
+        "200":
+          description: A page of timeline tasks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimelinePage"
+
+  /tasks/stats/today:
+    get:
+      operationId: getTodayStats
+      tags: [tasks]
+      summary: Get today's focus stats
+      description: Returns aggregated stats for today (completed blocks and minutes focused)
+      responses:
+        "200":
+          description: Today's stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodayStats"
+
+  /tasks/complete-focus:
+    post:
+      operationId: completeFocus
+      tags: [tasks]
+      summary: Complete a focus block for a task by name
+      description: >-
+        Marks the next open block for the given name (today) as done. If no open
+        block exists, a new completed block is created for today. Returns the
+        completed task so the caller can attach a rating.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteFocusInput"
+      responses:
+        "200":
+          description: Block completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
   /tasks/{id}:
     patch:
       operationId: updateTask
       tags: [tasks]
       summary: Update a task
-      description: Mark a task as completed or update its name
+      description: Mark a task done, rename it, attach a rating/notes, or adjust plays
       parameters:
         - name: id
           in: path
@@ -208,69 +173,6 @@ components:
       required:
         - status
 
-    Session:
-      type: object
-      required: [id, taskName, completedAt, durationMinutes]
-      properties:
-        id:
-          type: integer
-        taskName:
-          type: string
-        completedAt:
-          type: string
-          format: date-time
-        durationMinutes:
-          type: integer
-        rating:
-          type: ["string", "null"]
-          description: "Emoji rating: 😩 | 😐 | 🙂 | 🔥"
-        notes:
-          type: ["string", "null"]
-          description: "What was worked on during this session"
-
-    SessionInput:
-      type: object
-      required: [taskName]
-      properties:
-        taskName:
-          type: string
-          minLength: 1
-        durationMinutes:
-          type: integer
-          default: 30
-
-    SessionRating:
-      type: object
-      required: [rating]
-      properties:
-        rating:
-          type: string
-          enum: ["😩", "😐", "🙂", "🔥"]
-        notes:
-          type: string
-          description: "What was worked on during this session"
-
-    TodayStats:
-      type: object
-      required: [totalSessions, totalMinutes, ratingsBreakdown]
-      properties:
-        totalSessions:
-          type: integer
-        totalMinutes:
-          type: integer
-        ratingsBreakdown:
-          type: object
-          properties:
-            distracted:
-              type: integer
-            okay:
-              type: integer
-            good:
-              type: integer
-            great:
-              type: integer
-          required: [distracted, okay, good, great]
-
     Task:
       type: object
       required: [id, name, date, chunkIndex, totalChunks, completed, plays, createdAt]
@@ -292,6 +194,12 @@ components:
         plays:
           type: integer
           description: Number of times the timer was triggered for this task group
+        rating:
+          type: ["string", "null"]
+          description: "Emoji rating: 😩 | 😐 | 🙂 | 🔥"
+        notes:
+          type: ["string", "null"]
+          description: "What was worked on during this block"
         completedAt:
           type: ["string", "null"]
           format: date-time
@@ -321,6 +229,12 @@ components:
           type: boolean
         name:
           type: string
+        rating:
+          type: string
+          enum: ["😩", "😐", "🙂", "🔥"]
+        notes:
+          type: string
+          description: "What was worked on during this block"
         plays:
           type: integer
           minimum: 0
@@ -328,3 +242,35 @@ components:
           type: integer
           minimum: 1
           description: Atomically add this many plays to the current value
+
+    CompleteFocusInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    TimelinePage:
+      type: object
+      required: [tasks, hasMore]
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        nextCursor:
+          type: ["string", "null"]
+          format: date
+          description: Pass as `before` to load the next (older) page; null when no older days exist
+        hasMore:
+          type: boolean
+
+    TodayStats:
+      type: object
+      required: [totalBlocks, totalMinutes]
+      properties:
+        totalBlocks:
+          type: integer
+        totalMinutes:
+          type: integer

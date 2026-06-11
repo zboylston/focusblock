@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { db, tasksTable } from "@workspace/db";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, and, asc, desc, lt, inArray, sql } from "drizzle-orm";
 import {
-  ListTasksQueryParams,
   CreateTasksBody,
+  CompleteFocusBody,
   UpdateTaskParams,
   UpdateTaskBody,
   DeleteTaskParams,
@@ -12,7 +12,7 @@ import { getEasternDateString } from "../lib/time";
 
 const router = Router();
 
-// Resolves the planner date. Defaults to the current Eastern calendar day.
+// Resolves a calendar date. Defaults to the current Eastern calendar day.
 // An explicitly supplied date is treated as a calendar day (YYYY-MM-DD) — the
 // Zod schema coerces it to a UTC-midnight Date, so we read it back in UTC to
 // preserve the day the caller intended.
@@ -26,30 +26,14 @@ function resolveDateString(value?: string | Date): string {
   return value;
 }
 
-// GET /tasks
-router.get("/tasks", async (req, res) => {
-  const parsed = ListTasksQueryParams.safeParse(req.query);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid query params" });
-    return;
-  }
-
-  const dateStr = resolveDateString(parsed.data.date);
-
-  const tasks = await db
-    .select()
-    .from(tasksTable)
-    .where(eq(tasksTable.date, dateStr))
-    .orderBy(asc(tasksTable.createdAt), asc(tasksTable.chunkIndex));
-
-  res.json(
-    tasks.map((t) => ({
-      ...t,
-      completedAt: t.completedAt ? t.completedAt.toISOString() : null,
-      createdAt: t.createdAt.toISOString(),
-    }))
-  );
-});
+// Shapes a DB row into the API contract (timestamps as ISO strings).
+function serializeTask(t: typeof tasksTable.$inferSelect) {
+  return {
+    ...t,
+    completedAt: t.completedAt ? t.completedAt.toISOString() : null,
+    createdAt: t.createdAt.toISOString(),
+  };
+}
 
 // POST /tasks
 router.post("/tasks", async (req, res) => {
@@ -72,13 +56,141 @@ router.post("/tasks", async (req, res) => {
 
   const created = await db.insert(tasksTable).values(insertValues).returning();
 
-  res.status(201).json(
-    created.map((t) => ({
-      ...t,
-      completedAt: t.completedAt ? t.completedAt.toISOString() : null,
-      createdAt: t.createdAt.toISOString(),
-    }))
+  res.status(201).json(created.map(serializeTask));
+});
+
+// GET /tasks/timeline — paginated by distinct day, newest first.
+// Registered before /tasks/:id so the literal path takes precedence.
+router.get("/tasks/timeline", async (req, res) => {
+  // Query params arrive as strings; validate the calendar-day cursor directly
+  // rather than via the generated z.date() schema (which rejects strings).
+  const beforeRaw = typeof req.query.before === "string" ? req.query.before : undefined;
+  if (beforeRaw !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(beforeRaw)) {
+    res.status(400).json({ error: "Invalid 'before' (expected YYYY-MM-DD)" });
+    return;
+  }
+
+  const limitRaw =
+    typeof req.query.limit === "string" ? Number(req.query.limit) : NaN;
+  const limit = Number.isFinite(limitRaw)
+    ? Math.min(31, Math.max(1, Math.trunc(limitRaw)))
+    : 7;
+  const before = beforeRaw;
+
+  const dayFilter = before ? lt(tasksTable.date, before) : undefined;
+
+  const dayRows = await db
+    .selectDistinct({ date: tasksTable.date })
+    .from(tasksTable)
+    .where(dayFilter)
+    .orderBy(desc(tasksTable.date))
+    .limit(limit);
+
+  const days = dayRows.map((d) => d.date);
+
+  if (days.length === 0) {
+    res.json({ tasks: [], nextCursor: null, hasMore: false });
+    return;
+  }
+
+  const oldest = days[days.length - 1];
+
+  const tasks = await db
+    .select()
+    .from(tasksTable)
+    .where(inArray(tasksTable.date, days))
+    .orderBy(
+      desc(tasksTable.date),
+      asc(tasksTable.createdAt),
+      asc(tasksTable.chunkIndex),
+    );
+
+  const [older] = await db
+    .select({ date: tasksTable.date })
+    .from(tasksTable)
+    .where(lt(tasksTable.date, oldest))
+    .limit(1);
+
+  const hasMore = Boolean(older);
+  res.json({
+    tasks: tasks.map(serializeTask),
+    nextCursor: hasMore ? oldest : null,
+    hasMore,
+  });
+});
+
+// GET /tasks/stats/today — completed blocks and minutes for the Eastern today.
+router.get("/tasks/stats/today", async (_req, res) => {
+  const today = getEasternDateString();
+
+  const rows = await db
+    .select()
+    .from(tasksTable)
+    .where(and(eq(tasksTable.date, today), eq(tasksTable.completed, true)));
+
+  const totalBlocks = rows.length;
+  res.json({ totalBlocks, totalMinutes: totalBlocks * 30 });
+});
+
+// POST /tasks/complete-focus — mark the next open block for a name done.
+// If none is open, create a fresh completed block for today. This is the single
+// completion path a finished focus timer uses.
+router.post("/tasks/complete-focus", async (req, res) => {
+  const parsed = CompleteFocusBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+
+  const name = parsed.data.name;
+  const today = getEasternDateString();
+
+  // Atomically claim the lowest open block for this name+day. FOR UPDATE SKIP
+  // LOCKED ensures two concurrent completions never claim the same row (which
+  // would otherwise lose a completion event under rapid taps).
+  const [claimed] = await db
+    .update(tasksTable)
+    .set({ completed: true, completedAt: new Date() })
+    .where(
+      eq(
+        tasksTable.id,
+        sql`(select ${tasksTable.id} from ${tasksTable} where ${tasksTable.date} = ${today} and ${tasksTable.name} = ${name} and ${tasksTable.completed} = false order by ${tasksTable.chunkIndex} asc limit 1 for update skip locked)`,
+      ),
+    )
+    .returning();
+
+  if (claimed) {
+    res.json(serializeTask(claimed));
+    return;
+  }
+
+  // No open block — this was an unplanned focus run (or an extra block beyond
+  // the estimate). Append a completed block to the group for today.
+  const existing = await db
+    .select()
+    .from(tasksTable)
+    .where(and(eq(tasksTable.date, today), eq(tasksTable.name, name)));
+
+  const nextChunkIndex =
+    existing.reduce((max, t) => Math.max(max, t.chunkIndex), 0) + 1;
+  const totalChunks = existing.reduce(
+    (max, t) => Math.max(max, t.totalChunks),
+    nextChunkIndex,
   );
+
+  const [created] = await db
+    .insert(tasksTable)
+    .values({
+      name,
+      date: today,
+      chunkIndex: nextChunkIndex,
+      totalChunks,
+      completed: true,
+      completedAt: new Date(),
+    })
+    .returning();
+
+  res.json(serializeTask(created));
 });
 
 // PATCH /tasks/:id
@@ -102,6 +214,12 @@ router.patch("/tasks/:id", async (req, res) => {
   }
   if (bodyParsed.data.name !== undefined) {
     updates.name = bodyParsed.data.name;
+  }
+  if (bodyParsed.data.rating !== undefined) {
+    updates.rating = bodyParsed.data.rating;
+  }
+  if (bodyParsed.data.notes !== undefined) {
+    updates.notes = bodyParsed.data.notes;
   }
   if (bodyParsed.data.plays !== undefined) {
     updates.plays = bodyParsed.data.plays;
@@ -127,11 +245,7 @@ router.patch("/tasks/:id", async (req, res) => {
     return;
   }
 
-  res.json({
-    ...updated,
-    completedAt: updated.completedAt ? updated.completedAt.toISOString() : null,
-    createdAt: updated.createdAt.toISOString(),
-  });
+  res.json(serializeTask(updated));
 });
 
 // DELETE /tasks/:id

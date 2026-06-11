@@ -20,15 +20,13 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  CompleteFocusInput,
+  GetTimelineParams,
   HealthStatus,
-  ListSessionsParams,
-  ListTasksParams,
-  Session,
-  SessionInput,
-  SessionRating,
   Task,
   TaskInput,
   TaskUpdate,
+  TimelinePage,
   TodayStats
 } from './api.schemas';
 
@@ -122,399 +120,6 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
-export const getListSessionsUrl = (params?: ListSessionsParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/sessions?${stringifiedParams}` : `/api/sessions`
-}
-
-/**
- * Returns all focus sessions for today ordered by most recent
- * @summary List focus sessions
- */
-export const listSessions = async (params?: ListSessionsParams, options?: RequestInit): Promise<Session[]> => {
-
-  return customFetch<Session[]>(getListSessionsUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListSessionsQueryKey = (params?: ListSessionsParams,) => {
-    return [
-    `/api/sessions`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getListSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listSessions>>, TError = ErrorType<unknown>>(params?: ListSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListSessionsQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSessions>>> = ({ signal }) => listSessions(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listSessions>>>
-export type ListSessionsQueryError = ErrorType<unknown>
-
-
-/**
- * @summary List focus sessions
- */
-
-export function useListSessions<TData = Awaited<ReturnType<typeof listSessions>>, TError = ErrorType<unknown>>(
- params?: ListSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListSessionsQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-export const getCreateSessionUrl = () => {
-
-
-
-
-  return `/api/sessions`
-}
-
-/**
- * Records a completed 30-minute focus session
- * @summary Create a focus session
- */
-export const createSession = async (sessionInput: SessionInput, options?: RequestInit): Promise<Session> => {
-
-  return customFetch<Session>(getCreateSessionUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      sessionInput,)
-  }
-);}
-
-
-
-
-export const getCreateSessionMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,{data: BodyType<SessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,{data: BodyType<SessionInput>}, TContext> => {
-
-const mutationKey = ['createSession'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSession>>, {data: BodyType<SessionInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  createSession(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createSession>>>
-    export type CreateSessionMutationBody = BodyType<SessionInput>
-    export type CreateSessionMutationError = ErrorType<unknown>
-
-    /**
- * @summary Create a focus session
- */
-export const useCreateSession = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,{data: BodyType<SessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof createSession>>,
-        TError,
-        {data: BodyType<SessionInput>},
-        TContext
-      > => {
-      return useMutation(getCreateSessionMutationOptions(options));
-    }
-
-export const getRateSessionUrl = (id: number,) => {
-
-
-
-
-  return `/api/sessions/${id}`
-}
-
-/**
- * Updates the focus rating for a completed session
- * @summary Rate a focus session
- */
-export const rateSession = async (id: number,
-    sessionRating: SessionRating, options?: RequestInit): Promise<Session> => {
-
-  return customFetch<Session>(getRateSessionUrl(id),
-  {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      sessionRating,)
-  }
-);}
-
-
-
-
-export const getRateSessionMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rateSession>>, TError,{id: number;data: BodyType<SessionRating>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof rateSession>>, TError,{id: number;data: BodyType<SessionRating>}, TContext> => {
-
-const mutationKey = ['rateSession'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rateSession>>, {id: number;data: BodyType<SessionRating>}> = (props) => {
-          const {id,data} = props ?? {};
-
-          return  rateSession(id,data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type RateSessionMutationResult = NonNullable<Awaited<ReturnType<typeof rateSession>>>
-    export type RateSessionMutationBody = BodyType<SessionRating>
-    export type RateSessionMutationError = ErrorType<void>
-
-    /**
- * @summary Rate a focus session
- */
-export const useRateSession = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rateSession>>, TError,{id: number;data: BodyType<SessionRating>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof rateSession>>,
-        TError,
-        {id: number;data: BodyType<SessionRating>},
-        TContext
-      > => {
-      return useMutation(getRateSessionMutationOptions(options));
-    }
-
-export const getGetTodayStatsUrl = () => {
-
-
-
-
-  return `/api/sessions/stats/today`
-}
-
-/**
- * Returns aggregated stats for today (total sessions, ratings breakdown)
- * @summary Get today's session stats
- */
-export const getTodayStats = async ( options?: RequestInit): Promise<TodayStats> => {
-
-  return customFetch<TodayStats>(getGetTodayStatsUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetTodayStatsQueryKey = () => {
-    return [
-    `/api/sessions/stats/today`
-    ] as const;
-    }
-
-
-export const getGetTodayStatsQueryOptions = <TData = Awaited<ReturnType<typeof getTodayStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodayStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTodayStatsQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTodayStats>>> = ({ signal }) => getTodayStats({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTodayStats>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetTodayStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getTodayStats>>>
-export type GetTodayStatsQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Get today's session stats
- */
-
-export function useGetTodayStats<TData = Awaited<ReturnType<typeof getTodayStats>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodayStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetTodayStatsQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-export const getListTasksUrl = (params?: ListTasksParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/tasks?${stringifiedParams}` : `/api/tasks`
-}
-
-/**
- * Returns all tasks for today's daily planner
- * @summary List daily planner tasks
- */
-export const listTasks = async (params?: ListTasksParams, options?: RequestInit): Promise<Task[]> => {
-
-  return customFetch<Task[]>(getListTasksUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListTasksQueryKey = (params?: ListTasksParams,) => {
-    return [
-    `/api/tasks`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getListTasksQueryOptions = <TData = Awaited<ReturnType<typeof listTasks>>, TError = ErrorType<unknown>>(params?: ListTasksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListTasksQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTasks>>> = ({ signal }) => listTasks(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListTasksQueryResult = NonNullable<Awaited<ReturnType<typeof listTasks>>>
-export type ListTasksQueryError = ErrorType<unknown>
-
-
-/**
- * @summary List daily planner tasks
- */
-
-export function useListTasks<TData = Awaited<ReturnType<typeof listTasks>>, TError = ErrorType<unknown>>(
- params?: ListTasksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListTasksQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
 export const getCreateTasksUrl = () => {
 
 
@@ -587,6 +192,241 @@ export const useCreateTasks = <TError = ErrorType<unknown>,
       return useMutation(getCreateTasksMutationOptions(options));
     }
 
+export const getGetTimelineUrl = (params?: GetTimelineParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/tasks/timeline?${stringifiedParams}` : `/api/tasks/timeline`
+}
+
+/**
+ * Returns tasks grouped-ready for the timeline, newest day first, a page of days at a time. Pass the previous page's nextCursor as `before` to load older days.
+ * @summary Paginated timeline of tasks across days
+ */
+export const getTimeline = async (params?: GetTimelineParams, options?: RequestInit): Promise<TimelinePage> => {
+
+  return customFetch<TimelinePage>(getGetTimelineUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTimelineQueryKey = (params?: GetTimelineParams,) => {
+    return [
+    `/api/tasks/timeline`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTimelineQueryOptions = <TData = Awaited<ReturnType<typeof getTimeline>>, TError = ErrorType<unknown>>(params?: GetTimelineParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTimelineQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTimeline>>> = ({ signal }) => getTimeline(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTimeline>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTimelineQueryResult = NonNullable<Awaited<ReturnType<typeof getTimeline>>>
+export type GetTimelineQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Paginated timeline of tasks across days
+ */
+
+export function useGetTimeline<TData = Awaited<ReturnType<typeof getTimeline>>, TError = ErrorType<unknown>>(
+ params?: GetTimelineParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTimelineQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTodayStatsUrl = () => {
+
+
+
+
+  return `/api/tasks/stats/today`
+}
+
+/**
+ * Returns aggregated stats for today (completed blocks and minutes focused)
+ * @summary Get today's focus stats
+ */
+export const getTodayStats = async ( options?: RequestInit): Promise<TodayStats> => {
+
+  return customFetch<TodayStats>(getGetTodayStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTodayStatsQueryKey = () => {
+    return [
+    `/api/tasks/stats/today`
+    ] as const;
+    }
+
+
+export const getGetTodayStatsQueryOptions = <TData = Awaited<ReturnType<typeof getTodayStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodayStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTodayStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTodayStats>>> = ({ signal }) => getTodayStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTodayStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTodayStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getTodayStats>>>
+export type GetTodayStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get today's focus stats
+ */
+
+export function useGetTodayStats<TData = Awaited<ReturnType<typeof getTodayStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodayStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTodayStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCompleteFocusUrl = () => {
+
+
+
+
+  return `/api/tasks/complete-focus`
+}
+
+/**
+ * Marks the next open block for the given name (today) as done. If no open block exists, a new completed block is created for today. Returns the completed task so the caller can attach a rating.
+ * @summary Complete a focus block for a task by name
+ */
+export const completeFocus = async (completeFocusInput: CompleteFocusInput, options?: RequestInit): Promise<Task> => {
+
+  return customFetch<Task>(getCompleteFocusUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      completeFocusInput,)
+  }
+);}
+
+
+
+
+export const getCompleteFocusMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeFocus>>, TError,{data: BodyType<CompleteFocusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeFocus>>, TError,{data: BodyType<CompleteFocusInput>}, TContext> => {
+
+const mutationKey = ['completeFocus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeFocus>>, {data: BodyType<CompleteFocusInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  completeFocus(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteFocusMutationResult = NonNullable<Awaited<ReturnType<typeof completeFocus>>>
+    export type CompleteFocusMutationBody = BodyType<CompleteFocusInput>
+    export type CompleteFocusMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Complete a focus block for a task by name
+ */
+export const useCompleteFocus = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeFocus>>, TError,{data: BodyType<CompleteFocusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeFocus>>,
+        TError,
+        {data: BodyType<CompleteFocusInput>},
+        TContext
+      > => {
+      return useMutation(getCompleteFocusMutationOptions(options));
+    }
+
 export const getUpdateTaskUrl = (id: number,) => {
 
 
@@ -596,7 +436,7 @@ export const getUpdateTaskUrl = (id: number,) => {
 }
 
 /**
- * Mark a task as completed or update its name
+ * Mark a task done, rename it, attach a rating/notes, or adjust plays
  * @summary Update a task
  */
 export const updateTask = async (id: number,

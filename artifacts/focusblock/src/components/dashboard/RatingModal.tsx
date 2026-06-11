@@ -1,30 +1,30 @@
 import { useState } from "react";
-import { useRateSession, getListSessionsQueryKey, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
+import { useUpdateTask, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
 interface RatingModalProps {
-  sessionId: number;
+  taskId: number;
   onComplete: () => void;
 }
 
-export function RatingModal({ sessionId, onComplete }: RatingModalProps) {
+export function RatingModal({ taskId, onComplete }: RatingModalProps) {
   const [notes, setNotes] = useState("");
-  const rateSession = useRateSession();
+  const updateTask = useUpdateTask();
   const queryClient = useQueryClient();
 
   const handleRate = async (rating: "😩" | "😐" | "🙂" | "🔥") => {
     try {
-      await rateSession.mutateAsync({
-        id: sessionId,
-        data: { rating, ...(notes.trim() && { notes: notes.trim() }) }
+      await updateTask.mutateAsync({
+        id: taskId,
+        data: { rating, ...(notes.trim() && { notes: notes.trim() }) },
       });
-      queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["timeline"] });
       queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
       onComplete();
     } catch (err) {
-      console.error("Failed to rate session", err);
+      console.error("Failed to rate block", err);
     }
   };
 
@@ -32,7 +32,7 @@ export function RatingModal({ sessionId, onComplete }: RatingModalProps) {
     <Dialog open={true} onOpenChange={(open) => !open && onComplete()}>
       <DialogContent className="sm:max-w-md text-center p-8">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold mb-2">Session Complete!</DialogTitle>
+          <DialogTitle className="text-2xl font-bold mb-2">Block complete</DialogTitle>
           <DialogDescription className="text-base">
             How was your focus during this block?
           </DialogDescription>

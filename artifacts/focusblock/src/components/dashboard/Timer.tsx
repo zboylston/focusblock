@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { playAlertTone, primeAudio } from "@/lib/audio";
-import { useCreateSession, getListSessionsQueryKey, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
+import { useCompleteFocus, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { RatingModal } from "./RatingModal";
@@ -23,7 +23,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   const [mode, setMode] = useState<TimerMode>("focus");
   const [timeLeft, setTimeLeft] = useState(FOCUS_SECONDS);
   const [isActive, setIsActive] = useState(false);
-  const [completedSessionId, setCompletedSessionId] = useState<number | null>(null);
+  const [completedTaskId, setCompletedTaskId] = useState<number | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   // Bumped on every fresh (re)start so the countdown effect reliably tears down
   // and rebuilds its interval, even when the timer was already running.
@@ -37,7 +37,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   const originalTitle = useRef<string>(document.title);
 
   const queryClient = useQueryClient();
-  const createSession = useCreateSession();
+  const completeFocus = useCompleteFocus();
   const { toast } = useToast();
 
   const stopTitleFlash = useCallback(() => {
@@ -65,19 +65,19 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
 
     if (mode === "focus") {
       try {
-        const res = await createSession.mutateAsync({
-          data: { taskName: activeTaskName.trim() || "Deep work", durationMinutes: 30 },
+        const task = await completeFocus.mutateAsync({
+          data: { name: activeTaskName.trim() || "Deep work" },
         });
-        setCompletedSessionId(res.id);
+        setCompletedTaskId(task.id);
         setShowRatingModal(true);
-        queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ["timeline"] });
         queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
       } catch (err) {
-        console.error("Failed to create session", err);
+        console.error("Failed to complete focus block", err);
         stopTitleFlash();
         setTimeLeft(FOCUS_SECONDS);
         toast({
-          title: "Couldn't save your session",
+          title: "Couldn't save your block",
           description: "Something went wrong logging this focus block. Please try again.",
           variant: "destructive",
         });
@@ -88,7 +88,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
       setMode("focus");
       setTimeLeft(FOCUS_SECONDS);
     }
-  }, [mode, activeTaskName, createSession, queryClient, startTitleFlash, stopTitleFlash, toast]);
+  }, [mode, activeTaskName, completeFocus, queryClient, startTitleFlash, stopTitleFlash, toast]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -251,9 +251,9 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
         </CardContent>
       </Card>
 
-      {showRatingModal && completedSessionId && (
+      {showRatingModal && completedTaskId && (
         <RatingModal
-          sessionId={completedSessionId}
+          taskId={completedTaskId}
           onComplete={handleRatingComplete}
         />
       )}

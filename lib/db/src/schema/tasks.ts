@@ -10,6 +10,11 @@ export const tasksTable = pgTable("tasks", {
   totalChunks: integer("total_chunks").notNull().default(1),
   completed: boolean("completed").notNull().default(false),
   plays: integer("plays").notNull().default(0),
+  // Completion metadata. A block becomes "done" either when its focus timer
+  // finishes or when it is checked off manually; rating/notes are optional and
+  // only attached via the rating step after a timer completion.
+  rating: text("rating"),
+  notes: text("notes"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

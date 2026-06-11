@@ -16,6 +16,16 @@ export interface Task {
   completed: boolean;
   /** Number of times the timer was triggered for this task group */
   plays: number;
+  /**
+     * Emoji rating: 😩 | 😐 | 🙂 | 🔥
+     * @nullable
+     */
+  rating?: string | null;
+  /**
+     * What was worked on during this block
+     * @nullable
+     */
+  notes?: string | null;
   /** @nullable */
   completedAt?: Date | null;
   createdAt: Date;

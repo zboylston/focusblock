@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SessionRatingRating = typeof SessionRatingRating[keyof typeof SessionRatingRating];
+export type TaskUpdateRating = typeof TaskUpdateRating[keyof typeof TaskUpdateRating];
 
 
-export const SessionRatingRating = {
+export const TaskUpdateRating = {
   '😩': '😩',
   '😐': '😐',
   '🙂': '🙂',

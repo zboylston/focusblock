@@ -9,58 +9,6 @@ export interface HealthStatus {
   status: string;
 }
 
-export interface Session {
-  id: number;
-  taskName: string;
-  completedAt: string;
-  durationMinutes: number;
-  /**
-     * Emoji rating: 😩 | 😐 | 🙂 | 🔥
-     * @nullable
-     */
-  rating?: string | null;
-  /**
-     * What was worked on during this session
-     * @nullable
-     */
-  notes?: string | null;
-}
-
-export interface SessionInput {
-  /** @minLength 1 */
-  taskName: string;
-  durationMinutes?: number;
-}
-
-export type SessionRatingRating = typeof SessionRatingRating[keyof typeof SessionRatingRating];
-
-
-export const SessionRatingRating = {
-  '😩': '😩',
-  '😐': '😐',
-  '🙂': '🙂',
-  '🔥': '🔥',
-} as const;
-
-export interface SessionRating {
-  rating: SessionRatingRating;
-  /** What was worked on during this session */
-  notes?: string;
-}
-
-export type TodayStatsRatingsBreakdown = {
-  distracted: number;
-  okay: number;
-  good: number;
-  great: number;
-};
-
-export interface TodayStats {
-  totalSessions: number;
-  totalMinutes: number;
-  ratingsBreakdown: TodayStatsRatingsBreakdown;
-}
-
 export interface Task {
   id: number;
   name: string;
@@ -71,6 +19,16 @@ export interface Task {
   completed: boolean;
   /** Number of times the timer was triggered for this task group */
   plays: number;
+  /**
+     * Emoji rating: 😩 | 😐 | 🙂 | 🔥
+     * @nullable
+     */
+  rating?: string | null;
+  /**
+     * What was worked on during this block
+     * @nullable
+     */
+  notes?: string | null;
   /** @nullable */
   completedAt?: string | null;
   createdAt: string;
@@ -87,9 +45,22 @@ export interface TaskInput {
   date?: string;
 }
 
+export type TaskUpdateRating = typeof TaskUpdateRating[keyof typeof TaskUpdateRating];
+
+
+export const TaskUpdateRating = {
+  '😩': '😩',
+  '😐': '😐',
+  '🙂': '🙂',
+  '🔥': '🔥',
+} as const;
+
 export interface TaskUpdate {
   completed?: boolean;
   name?: string;
+  rating?: TaskUpdateRating;
+  /** What was worked on during this block */
+  notes?: string;
   /** @minimum 0 */
   plays?: number;
   /**
@@ -99,17 +70,36 @@ export interface TaskUpdate {
   incrementPlays?: number;
 }
 
-export type ListSessionsParams = {
-/**
- * ISO date string (YYYY-MM-DD) to filter sessions, defaults to today
- */
-date?: string;
-};
+export interface CompleteFocusInput {
+  /** @minLength 1 */
+  name: string;
+}
 
-export type ListTasksParams = {
+export interface TimelinePage {
+  tasks: Task[];
+  /**
+     * Pass as `before` to load the next (older) page; null when no older days exist
+     * @nullable
+     */
+  nextCursor?: string | null;
+  hasMore: boolean;
+}
+
+export interface TodayStats {
+  totalBlocks: number;
+  totalMinutes: number;
+}
+
+export type GetTimelineParams = {
 /**
- * ISO date string (YYYY-MM-DD) to filter tasks, defaults to today
+ * Only return days strictly before this calendar date (YYYY-MM-DD)
  */
-date?: string;
+before?: string;
+/**
+ * Number of distinct days to return in this page
+ * @minimum 1
+ * @maximum 31
+ */
+limit?: number;
 };
 

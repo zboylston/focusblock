@@ -16,3 +16,9 @@ For an OpenAPI field with `format: date` (or `date-time`), Orval generates **two
 - In server routes, normalize a coerced `Date` back to a calendar string with `value.toISOString().slice(0, 10)` to preserve the intended `YYYY-MM-DD` (coerced `Date` from "YYYY-MM-DD" is UTC midnight, so UTC slice round-trips correctly). Do NOT format it in a local/Eastern timezone — that shifts the day.
 - Query params without a `format` stay `zod.coerce.string()` → already a string; no conversion needed.
 - If you don't want the `Date` coercion at all, drop `format: date` from the request body field in `openapi.yaml` and re-run codegen.
+
+## Query params with `format: date` are worse: non-coercing `z.date()`
+
+A **query parameter** declared `type: string, format: date` generates `zod.date()` (NOT `zod.coerce.date()`) in the params schema. Express puts a raw **string** in `req.query`, so `Params.safeParse(req.query)` **fails** (`z.date()` rejects strings) → 400. First page (no cursor) works, but any request that actually sends the param breaks.
+
+**How to apply:** for date-ish query params (e.g. a `before`/cursor), do NOT validate via the generated `…QueryParams` schema. Validate the raw string yourself in the route, e.g. `if (!/^\d{4}-\d{2}-\d{2}$/.test(before)) return 400`. Coerce `limit` etc. with `Number(...)` manually too. Keep `format: date` in the spec for docs/client types; just bypass the generated server-side query schema.

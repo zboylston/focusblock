@@ -5,10 +5,14 @@
  * FocusBlock API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { TaskUpdateRating } from './taskUpdateRating';
 
 export interface TaskUpdate {
   completed?: boolean;
   name?: string;
+  rating?: TaskUpdateRating;
+  /** What was worked on during this block */
+  notes?: string;
   /** @minimum 0 */
   plays?: number;
   /**
