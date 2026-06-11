@@ -9,4 +9,11 @@
 export interface TaskUpdate {
   completed?: boolean;
   name?: string;
+  /** @minimum 0 */
+  plays?: number;
+  /**
+     * Atomically add this many plays to the current value
+     * @minimum 1
+     */
+  incrementPlays?: number;
 }

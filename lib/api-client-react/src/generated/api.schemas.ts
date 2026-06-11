@@ -65,10 +65,12 @@ export interface Task {
   id: number;
   name: string;
   date: string;
-  /** 1-based index within its chunk group */
+  /** 1-based index within its block group */
   chunkIndex: number;
   totalChunks: number;
   completed: boolean;
+  /** Number of times the timer was triggered for this task group */
+  plays: number;
   /** @nullable */
   completedAt?: string | null;
   createdAt: string;
@@ -88,6 +90,13 @@ export interface TaskInput {
 export interface TaskUpdate {
   completed?: boolean;
   name?: string;
+  /** @minimum 0 */
+  plays?: number;
+  /**
+     * Atomically add this many plays to the current value
+     * @minimum 1
+     */
+  incrementPlays?: number;
 }
 
 export type ListSessionsParams = {

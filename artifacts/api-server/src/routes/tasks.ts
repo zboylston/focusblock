@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, tasksTable } from "@workspace/db";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, sql } from "drizzle-orm";
 import {
   ListTasksQueryParams,
   CreateTasksBody,
@@ -102,6 +102,13 @@ router.patch("/tasks/:id", async (req, res) => {
   }
   if (bodyParsed.data.name !== undefined) {
     updates.name = bodyParsed.data.name;
+  }
+  if (bodyParsed.data.plays !== undefined) {
+    updates.plays = bodyParsed.data.plays;
+  }
+  // Atomic increment avoids lost updates from concurrent/rapid play taps.
+  if (bodyParsed.data.incrementPlays !== undefined) {
+    updates.plays = sql`${tasksTable.plays} + ${bodyParsed.data.incrementPlays}`;
   }
 
   if (Object.keys(updates).length === 0) {

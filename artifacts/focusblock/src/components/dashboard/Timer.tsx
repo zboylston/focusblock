@@ -16,14 +16,18 @@ const BREAK_SECONDS = 5 * 60;
 interface TimerProps {
   activeTaskName: string;
   onTaskNameChange: (name: string) => void;
+  startToken: number;
 }
 
-export function Timer({ activeTaskName, onTaskNameChange }: TimerProps) {
+export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerProps) {
   const [mode, setMode] = useState<TimerMode>("focus");
   const [timeLeft, setTimeLeft] = useState(FOCUS_SECONDS);
   const [isActive, setIsActive] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState<number | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  // Bumped on every fresh (re)start so the countdown effect reliably tears down
+  // and rebuilds its interval, even when the timer was already running.
+  const [runId, setRunId] = useState(0);
 
   // Target end timestamp drives the countdown so it stays accurate even when
   // the tab is backgrounded (where setInterval is throttled to ~1/min).
@@ -108,7 +112,7 @@ export function Timer({ activeTaskName, onTaskNameChange }: TimerProps) {
     };
     // timeLeft is intentionally read once at start; it is not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, handleTimerComplete]);
+  }, [isActive, runId, handleTimerComplete]);
 
   // Clean up any running intervals and restore the tab title on unmount.
   useEffect(() => {
@@ -118,6 +122,25 @@ export function Timer({ activeTaskName, onTaskNameChange }: TimerProps) {
       document.title = originalTitle.current;
     };
   }, []);
+
+  // Hitting "play" on a planner task bumps startToken — start a fresh focus
+  // block for it immediately. (startToken 0 is the initial mount, so skip it.)
+  const prevStartToken = useRef(startToken);
+  useEffect(() => {
+    if (startToken === prevStartToken.current) return;
+    prevStartToken.current = startToken;
+    stopTitleFlash();
+    setShowRatingModal(false);
+    setMode("focus");
+    setTimeLeft(FOCUS_SECONDS);
+    // Set a valid fresh end time synchronously so any still-running interval
+    // computes ~30:00 (not a bogus value from a nulled ref) until the effect
+    // rebuilds. runId bump guarantees that rebuild even if isActive is unchanged.
+    endTimeRef.current = Date.now() + FOCUS_SECONDS * 1000;
+    primeAudio();
+    setIsActive(true);
+    setRunId((n) => n + 1);
+  }, [startToken, stopTitleFlash]);
 
   const toggleTimer = () => {
     if (!isActive && mode === "focus" && !activeTaskName.trim()) return;

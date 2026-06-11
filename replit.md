@@ -45,6 +45,7 @@ A full-stack time-blocking and focus timer app for deep work. Track 30-minute fo
 - 5-minute break timer auto-queued after each focus session
 - Rating modal on completion (😩 😐 🙂 🔥) — saved to DB
 - Daily Planner: add tasks with chunk counts; clicking an uncompleted task pre-fills the timer
+- Daily Planner: a play button on each task group auto-starts a fresh 30-min focus block and increments a per-group "plays" counter (separate from the manually-clickable completion dots)
 - Session Log: today's completed sessions with timestamps and ratings
 - Live "X chunks until 5 PM EST" counter in the header
 
@@ -57,6 +58,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 - Run `pnpm --filter @workspace/api-spec run codegen` after every spec change before using new hooks
 - `date` columns use `mode: "string"` — always pass `YYYY-MM-DD` strings, never Date objects
 - The `/sessions/stats/today` route must be registered BEFORE `/sessions/:id` to avoid route collision in Express
+- Per-group "plays" are stored on the first block (chunkIndex 1) of a task group; increment via `PATCH /tasks/:id { incrementPlays: 1 }` which is atomic server-side (avoids lost updates from rapid taps) — do not read-modify-write `plays` from the client
 
 ## Pointers
 

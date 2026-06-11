@@ -10,10 +10,12 @@ export interface Task {
   id: number;
   name: string;
   date: Date;
-  /** 1-based index within its chunk group */
+  /** 1-based index within its block group */
   chunkIndex: number;
   totalChunks: number;
   completed: boolean;
+  /** Number of times the timer was triggered for this task group */
+  plays: number;
   /** @nullable */
   completedAt?: Date | null;
   createdAt: Date;

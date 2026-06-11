@@ -1,1 +1,2 @@
 - [Orval format:date coercion](orval-date-coercion.md) — OpenAPI format:date body fields arrive as `Date` in server Zod validation but `string` in client types; normalize in routes.
+- [Countdown timer restart pattern](timer-restart-pattern.md) — to restart a running React setInterval countdown, set endTimeRef to a fresh valid timestamp synchronously + bump a runId in the effect deps; never leave the ref null.

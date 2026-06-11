@@ -4,10 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Play } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface DailyPlannerProps {
   onTaskSelect: (taskName: string) => void;
+  onTaskStart: (taskName: string) => void;
 }
 
 type Task = {
@@ -16,6 +18,7 @@ type Task = {
   chunkIndex: number;
   totalChunks: number;
   completed: boolean;
+  plays: number;
   completedAt: string | null;
   createdAt: string;
   date: string;
@@ -26,6 +29,7 @@ type TaskGroup = {
   blocks: Task[];
   totalEstimated: number;
   completedCount: number;
+  plays: number;
 };
 
 function groupTasks(tasks: Task[]): TaskGroup[] {
@@ -42,15 +46,18 @@ function groupTasks(tasks: Task[]): TaskGroup[] {
       blocks: sorted,
       totalEstimated: sorted[0].totalChunks,
       completedCount: sorted.filter((b) => b.completed).length,
+      // Plays are tracked on the first block of the group.
+      plays: sorted[0].plays,
     };
   });
 }
 
-export function DailyPlanner({ onTaskSelect }: DailyPlannerProps) {
+export function DailyPlanner({ onTaskSelect, onTaskStart }: DailyPlannerProps) {
   const [newTaskName, setNewTaskName] = useState("");
   const [blockCount, setBlockCount] = useState<number>(1);
 
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data: tasks, isLoading } = useListTasks();
 
   const createTasks = useCreateTasks();
@@ -78,6 +85,27 @@ export function DailyPlanner({ onTaskSelect }: DailyPlannerProps) {
       invalidate();
     } catch (err) {
       console.error("Failed to toggle block", err);
+    }
+  };
+
+  const handlePlay = async (group: TaskGroup) => {
+    // Start the timer for this task immediately, then record the play on the
+    // group's first block. The increment is atomic server-side so rapid taps
+    // never lose a count.
+    onTaskStart(group.name);
+    try {
+      await updateTask.mutateAsync({
+        id: group.blocks[0].id,
+        data: { incrementPlays: 1 },
+      });
+      invalidate();
+    } catch (err) {
+      console.error("Failed to record play", err);
+      toast({
+        title: "Couldn't record this play",
+        description: "Your timer started, but the play count wasn't saved.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -175,13 +203,32 @@ export function DailyPlanner({ onTaskSelect }: DailyPlannerProps) {
                     <span className={`font-medium truncate ${allDone ? "line-through text-muted-foreground" : "text-foreground"}`}>
                       {group.name}
                     </span>
-                    <span className="text-xs text-muted-foreground font-mono mt-0.5">
-                      {group.completedCount} / {group.totalEstimated} blocks
-                      {overEstimate && (
-                        <span className="ml-1 text-amber-500">+{group.completedCount - group.totalEstimated} over</span>
+                    <span className="text-xs text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
+                      <span>
+                        {group.completedCount} / {group.totalEstimated} blocks
+                        {overEstimate && (
+                          <span className="ml-1 text-amber-500">+{group.completedCount - group.totalEstimated} over</span>
+                        )}
+                      </span>
+                      {group.plays > 0 && (
+                        <span className="flex items-center gap-0.5 text-primary/80">
+                          <Play className="w-3 h-3 fill-current" />
+                          {group.plays}
+                        </span>
                       )}
                     </span>
                   </div>
+
+                  {/* Play this task */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Start a 30-min focus block for this task"
+                    className="flex-shrink-0 text-primary hover:text-primary hover:bg-primary/10"
+                    onClick={() => handlePlay(group)}
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                  </Button>
 
                   {/* Delete group */}
                   <Button

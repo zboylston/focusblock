@@ -100,9 +100,10 @@ export const ListTasksResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "date": zod.coerce.date(),
-  "chunkIndex": zod.number().describe('1-based index within its chunk group'),
+  "chunkIndex": zod.number().describe('1-based index within its block group'),
   "totalChunks": zod.number(),
   "completed": zod.boolean(),
+  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -133,18 +134,26 @@ export const UpdateTaskParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateTaskBodyPlaysMin = 0;
+
+
+
+
 export const UpdateTaskBody = zod.object({
   "completed": zod.boolean().optional(),
-  "name": zod.string().optional()
+  "name": zod.string().optional(),
+  "plays": zod.number().min(updateTaskBodyPlaysMin).optional(),
+  "incrementPlays": zod.number().min(1).optional().describe('Atomically add this many plays to the current value')
 })
 
 export const UpdateTaskResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "date": zod.coerce.date(),
-  "chunkIndex": zod.number().describe('1-based index within its chunk group'),
+  "chunkIndex": zod.number().describe('1-based index within its block group'),
   "totalChunks": zod.number(),
   "completed": zod.boolean(),
+  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })

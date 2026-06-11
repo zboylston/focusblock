@@ -9,6 +9,7 @@ export const tasksTable = pgTable("tasks", {
   chunkIndex: integer("chunk_index").notNull().default(1),
   totalChunks: integer("total_chunks").notNull().default(1),
   completed: boolean("completed").notNull().default(false),
+  plays: integer("plays").notNull().default(0),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

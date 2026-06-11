@@ -273,7 +273,7 @@ components:
 
     Task:
       type: object
-      required: [id, name, date, chunkIndex, totalChunks, completed, createdAt]
+      required: [id, name, date, chunkIndex, totalChunks, completed, plays, createdAt]
       properties:
         id:
           type: integer
@@ -284,11 +284,14 @@ components:
           format: date
         chunkIndex:
           type: integer
-          description: 1-based index within its chunk group
+          description: 1-based index within its block group
         totalChunks:
           type: integer
         completed:
           type: boolean
+        plays:
+          type: integer
+          description: Number of times the timer was triggered for this task group
         completedAt:
           type: ["string", "null"]
           format: date-time
@@ -318,3 +321,10 @@ components:
           type: boolean
         name:
           type: string
+        plays:
+          type: integer
+          minimum: 0
+        incrementPlays:
+          type: integer
+          minimum: 1
+          description: Atomically add this many plays to the current value
