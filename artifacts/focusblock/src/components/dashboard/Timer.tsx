@@ -221,13 +221,18 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
 
           <div className="w-full max-w-xs mb-8">
             {mode === "focus" ? (
-              <Input
-                placeholder="What are you focusing on?"
-                value={activeTaskName}
-                onChange={(e) => onTaskNameChange(e.target.value)}
-                className="text-center bg-transparent border-t-0 border-x-0 border-b-2 border-border/50 focus-visible:border-primary focus-visible:ring-0 rounded-none px-0 text-xl font-bold text-foreground placeholder:text-muted-foreground/50 placeholder:font-normal h-12"
-                disabled={isActive}
-              />
+              isActive ? (
+                <div className="text-center text-xl font-bold text-foreground h-12 flex items-center justify-center truncate px-1">
+                  {activeTaskName || "Deep work"}
+                </div>
+              ) : (
+                <Input
+                  placeholder="What are you focusing on?"
+                  value={activeTaskName}
+                  onChange={(e) => onTaskNameChange(e.target.value)}
+                  className="text-center bg-transparent border-t-0 border-x-0 border-b-2 border-border/50 focus-visible:border-primary focus-visible:ring-0 rounded-none px-0 text-base text-foreground placeholder:text-muted-foreground/50 h-12"
+                />
+              )
             ) : (
               <div className="text-center text-lg text-muted-foreground h-12 flex items-center justify-center">
                 Take a breather
