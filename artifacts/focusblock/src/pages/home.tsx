@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Timer, SessionLog, DailyPlanner, Header } from "@/components/dashboard";
 
 export default function Home() {

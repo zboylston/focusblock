@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, RotateCcw, Coffee, Focus } from "lucide-react";
+import { Play, Pause, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { playAlertTone } from "@/lib/audio";
 import { useCreateSession, getListSessionsQueryKey, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { RatingModal } from "./RatingModal";
 
 type TimerMode = "focus" | "break";
-const FOCUS_MINUTES = 30;
-const BREAK_MINUTES = 5;
+const FOCUS_SECONDS = 30 * 60;
+const BREAK_SECONDS = 5 * 60;
 
 interface TimerProps {
   activeTaskName: string;
@@ -19,33 +20,49 @@ interface TimerProps {
 
 export function Timer({ activeTaskName, onTaskNameChange }: TimerProps) {
   const [mode, setMode] = useState<TimerMode>("focus");
-  const [timeLeft, setTimeLeft] = useState(FOCUS_MINUTES * 60);
+  const [timeLeft, setTimeLeft] = useState(FOCUS_SECONDS);
   const [isActive, setIsActive] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState<number | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const titleFlashRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Target end timestamp drives the countdown so it stays accurate even when
+  // the tab is backgrounded (where setInterval is throttled to ~1/min).
+  const endTimeRef = useRef<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const titleFlashRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const originalTitle = useRef<string>(document.title);
 
   const queryClient = useQueryClient();
   const createSession = useCreateSession();
+  const { toast } = useToast();
 
-  const handleTimerComplete = useCallback(async () => {
-    setIsActive(false);
-    playAlertTone();
+  const stopTitleFlash = useCallback(() => {
+    if (titleFlashRef.current) {
+      clearInterval(titleFlashRef.current);
+      titleFlashRef.current = null;
+    }
+    document.title = originalTitle.current;
+  }, []);
 
-    // Start title flash
+  const startTitleFlash = useCallback(() => {
+    if (titleFlashRef.current) clearInterval(titleFlashRef.current);
     let flash = false;
     titleFlashRef.current = setInterval(() => {
       document.title = flash ? "Session Complete!" : originalTitle.current;
       flash = !flash;
     }, 1000);
+  }, []);
+
+  const handleTimerComplete = useCallback(async () => {
+    setIsActive(false);
+    endTimeRef.current = null;
+    playAlertTone();
+    startTitleFlash();
 
     if (mode === "focus") {
       try {
         const res = await createSession.mutateAsync({
-          data: { taskName: activeTaskName || "Deep work", durationMinutes: FOCUS_MINUTES }
+          data: { taskName: activeTaskName.trim() || "Deep work", durationMinutes: 30 },
         });
         setCompletedSessionId(res.id);
         setShowRatingModal(true);
@@ -53,62 +70,94 @@ export function Timer({ activeTaskName, onTaskNameChange }: TimerProps) {
         queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
       } catch (err) {
         console.error("Failed to create session", err);
+        stopTitleFlash();
+        setTimeLeft(FOCUS_SECONDS);
+        toast({
+          title: "Couldn't save your session",
+          description: "Something went wrong logging this focus block. Please try again.",
+          variant: "destructive",
+        });
       }
     } else {
-      // Break complete
-      setMode("focus");
-      setTimeLeft(FOCUS_MINUTES * 60);
+      // Break finished — return to a fresh focus block.
       stopTitleFlash();
+      setMode("focus");
+      setTimeLeft(FOCUS_SECONDS);
     }
-  }, [mode, activeTaskName, createSession, queryClient]);
-
-  const stopTitleFlash = () => {
-    if (titleFlashRef.current) clearInterval(titleFlashRef.current);
-    document.title = originalTitle.current;
-  };
+  }, [mode, activeTaskName, createSession, queryClient, startTitleFlash, stopTitleFlash, toast]);
 
   useEffect(() => {
-    if (isActive && timeLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (isActive && timeLeft === 0) {
-      handleTimerComplete();
+    if (!isActive) return;
+    if (endTimeRef.current === null) {
+      endTimeRef.current = Date.now() + timeLeft * 1000;
     }
+    const tick = () => {
+      const remaining = Math.max(0, Math.round((endTimeRef.current! - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = null;
+        handleTimerComplete();
+      }
+    };
+    tick();
+    timerRef.current = setInterval(tick, 250);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = null;
     };
-  }, [isActive, timeLeft, handleTimerComplete]);
+    // timeLeft is intentionally read once at start; it is not a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, handleTimerComplete]);
+
+  // Clean up any running intervals and restore the tab title on unmount.
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (titleFlashRef.current) clearInterval(titleFlashRef.current);
+      document.title = originalTitle.current;
+    };
+  }, []);
 
   const toggleTimer = () => {
-    if (!isActive && mode === "focus" && !activeTaskName.trim()) {
-      // Could show toast here, but for now just focus or do nothing
-      return;
+    if (!isActive && mode === "focus" && !activeTaskName.trim()) return;
+    if (isActive) {
+      // Pausing: freeze the remaining time by dropping the target timestamp.
+      endTimeRef.current = null;
     }
-    setIsActive(!isActive);
+    setIsActive((prev) => !prev);
   };
 
   const resetTimer = () => {
     setIsActive(false);
-    setTimeLeft(mode === "focus" ? FOCUS_MINUTES * 60 : BREAK_MINUTES * 60);
+    endTimeRef.current = null;
+    setTimeLeft(mode === "focus" ? FOCUS_SECONDS : BREAK_SECONDS);
+  };
+
+  const switchMode = (next: TimerMode) => {
+    setIsActive(false);
+    endTimeRef.current = null;
+    setMode(next);
+    setTimeLeft(next === "focus" ? FOCUS_SECONDS : BREAK_SECONDS);
   };
 
   const handleRatingComplete = () => {
     setShowRatingModal(false);
     stopTitleFlash();
     setMode("break");
-    setTimeLeft(BREAK_MINUTES * 60);
+    setTimeLeft(BREAK_SECONDS);
+    endTimeRef.current = null;
   };
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
   const timeString = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
-  // Update doc title with timer if active
+  // Keep the tab title in sync with the running timer (unless it's flashing).
   useEffect(() => {
     if (isActive) {
       document.title = `${timeString} - ${activeTaskName || "FocusBlock"}`;
-    } else if (!showRatingModal) {
+    } else if (!showRatingModal && !titleFlashRef.current) {
       document.title = originalTitle.current;
     }
   }, [timeString, isActive, activeTaskName, showRatingModal]);
@@ -120,13 +169,13 @@ export function Timer({ activeTaskName, onTaskNameChange }: TimerProps) {
           <div className="flex gap-2 bg-muted/50 p-1 rounded-full mb-8">
             <button
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${mode === "focus" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => { setMode("focus"); setTimeLeft(FOCUS_MINUTES * 60); setIsActive(false); }}
+              onClick={() => switchMode("focus")}
             >
               Focus
             </button>
             <button
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${mode === "break" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => { setMode("break"); setTimeLeft(BREAK_MINUTES * 60); setIsActive(false); }}
+              onClick={() => switchMode("break")}
             >
               Break
             </button>

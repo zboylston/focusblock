@@ -1,0 +1,1 @@
+- [Orval format:date coercion](orval-date-coercion.md) — OpenAPI format:date body fields arrive as `Date` in server Zod validation but `string` in client types; normalize in routes.

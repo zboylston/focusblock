@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, tasksTable } from "@workspace/db";
-import { eq, and, gte, lte, asc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import {
   ListTasksQueryParams,
   CreateTasksBody,
@@ -8,13 +8,22 @@ import {
   UpdateTaskBody,
   DeleteTaskParams,
 } from "@workspace/api-zod";
+import { getEasternDateString } from "../lib/time";
 
 const router = Router();
 
-function todayString(dateStr?: string): string {
-  if (dateStr) return dateStr;
-  const now = new Date();
-  return now.toISOString().slice(0, 10);
+// Resolves the planner date. Defaults to the current Eastern calendar day.
+// An explicitly supplied date is treated as a calendar day (YYYY-MM-DD) — the
+// Zod schema coerces it to a UTC-midnight Date, so we read it back in UTC to
+// preserve the day the caller intended.
+function resolveDateString(value?: string | Date): string {
+  if (!value) {
+    return getEasternDateString();
+  }
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  return value;
 }
 
 // GET /tasks
@@ -25,7 +34,7 @@ router.get("/tasks", async (req, res) => {
     return;
   }
 
-  const dateStr = todayString(parsed.data.date);
+  const dateStr = resolveDateString(parsed.data.date);
 
   const tasks = await db
     .select()
@@ -51,7 +60,7 @@ router.post("/tasks", async (req, res) => {
   }
 
   const { name, chunks, date } = parsed.data;
-  const dateStr = todayString(date);
+  const dateStr = resolveDateString(date);
 
   const insertValues = Array.from({ length: chunks }, (_, i) => ({
     name,
@@ -93,6 +102,11 @@ router.patch("/tasks/:id", async (req, res) => {
   }
   if (bodyParsed.data.name !== undefined) {
     updates.name = bodyParsed.data.name;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No fields to update" });
+    return;
   }
 
   const [updated] = await db

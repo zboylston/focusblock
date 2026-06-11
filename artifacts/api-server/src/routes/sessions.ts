@@ -1,23 +1,15 @@
 import { Router } from "express";
 import { db, sessionsTable } from "@workspace/db";
-import { desc, eq, gte, lte, and, sql } from "drizzle-orm";
+import { desc, eq, gte, lt, and } from "drizzle-orm";
 import {
   ListSessionsQueryParams,
   CreateSessionBody,
   RateSessionParams,
   RateSessionBody,
 } from "@workspace/api-zod";
+import { getEasternDayRange } from "../lib/time";
 
 const router = Router();
-
-function getTodayRange(dateStr?: string): { start: Date; end: Date } {
-  const base = dateStr ? new Date(dateStr) : new Date();
-  const start = new Date(base);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(base);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
-}
 
 // GET /sessions
 router.get("/sessions", async (req, res) => {
@@ -27,7 +19,7 @@ router.get("/sessions", async (req, res) => {
     return;
   }
 
-  const { start, end } = getTodayRange(parsed.data.date);
+  const { start, end } = getEasternDayRange(parsed.data.date);
 
   const sessions = await db
     .select()
@@ -35,7 +27,7 @@ router.get("/sessions", async (req, res) => {
     .where(
       and(
         gte(sessionsTable.completedAt, start),
-        lte(sessionsTable.completedAt, end)
+        lt(sessionsTable.completedAt, end)
       )
     )
     .orderBy(desc(sessionsTable.completedAt));
@@ -102,8 +94,8 @@ router.patch("/sessions/:id", async (req, res) => {
 });
 
 // GET /sessions/stats/today
-router.get("/sessions/stats/today", async (req, res) => {
-  const { start, end } = getTodayRange();
+router.get("/sessions/stats/today", async (_req, res) => {
+  const { start, end } = getEasternDayRange();
 
   const sessions = await db
     .select()
@@ -111,7 +103,7 @@ router.get("/sessions/stats/today", async (req, res) => {
     .where(
       and(
         gte(sessionsTable.completedAt, start),
-        lte(sessionsTable.completedAt, end)
+        lt(sessionsTable.completedAt, end)
       )
     );
 

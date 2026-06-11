@@ -7,29 +7,21 @@ export function Header() {
   useEffect(() => {
     const calculateChunksLeft = () => {
       const now = new Date();
-      
-      // Calculate 5 PM EST today
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York',
-        year: 'numeric', month: 'numeric', day: 'numeric',
-        hour: 'numeric', minute: 'numeric', second: 'numeric',
-        hour12: false,
-      });
-      
-      const parts = formatter.formatToParts(now);
-      const tzDate = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
-      
-      const targetTimeEst = new Date(tzDate);
-      targetTimeEst.setHours(17, 0, 0, 0); // 5 PM EST
 
-      const diffMs = targetTimeEst.getTime() - tzDate.getTime();
-      
+      // Shift "now" into Eastern wall-clock time so both the current time and
+      // the 5 PM target live in the same frame; their difference is then the
+      // real time remaining. America/New_York handles DST automatically.
+      const eastern = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+      const target = new Date(eastern);
+      target.setHours(17, 0, 0, 0); // 5 PM Eastern
+
+      const diffMs = target.getTime() - eastern.getTime();
+
       if (diffMs <= 0) {
         setChunksLeft(0);
       } else {
-        // A chunk is 30 mins focus + 5 mins break = 35 mins
-        const chunks = Math.floor(diffMs / (1000 * 60 * 35));
-        setChunksLeft(chunks);
+        // A chunk is 30 mins focus + 5 mins break = 35 mins.
+        setChunksLeft(Math.floor(diffMs / (1000 * 60 * 35)));
       }
     };
 
@@ -48,7 +40,7 @@ export function Header() {
       </div>
       <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1.5 rounded-full flex items-center gap-2">
         <div className="w-2 h-2 rounded-full bg-primary/80 animate-pulse"></div>
-        {chunksLeft} chunks left until 5 PM
+        {chunksLeft} chunks left until 5 PM EST
       </div>
     </header>
   );
