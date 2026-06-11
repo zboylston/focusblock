@@ -31,6 +31,8 @@ type TaskGroup = {
 type DaySection = {
   date: string;
   groups: TaskGroup[];
+  completedBlocks: number;
+  minutes: number;
 };
 
 const PAGE_DAYS = 7;
@@ -114,10 +116,15 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
       existing.push(t);
       byDate.set(t.date, existing);
     }
-    return Array.from(byDate.entries()).map(([date, tasks]) => ({
-      date,
-      groups: groupByName(tasks),
-    }));
+    return Array.from(byDate.entries()).map(([date, tasks]) => {
+      const completedBlocks = tasks.filter((t) => t.completed).length;
+      return {
+        date,
+        groups: groupByName(tasks),
+        completedBlocks,
+        minutes: completedBlocks * 30,
+      };
+    });
   }, [data]);
 
   const handleAddTask = async (e: React.FormEvent) => {
@@ -253,6 +260,15 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
                   {dayLabel(section.date)}
                 </h2>
                 <div className="h-px flex-1 bg-border/60" />
+                <span className="text-xs text-muted-foreground/70 whitespace-nowrap tabular-nums">
+                  {section.completedBlocks > 0 ? (
+                    <>
+                      {section.completedBlocks} {section.completedBlocks === 1 ? "block" : "blocks"} · {section.minutes} min
+                    </>
+                  ) : (
+                    "No focus logged"
+                  )}
+                </span>
               </div>
 
               <div className="flex flex-col gap-1">
