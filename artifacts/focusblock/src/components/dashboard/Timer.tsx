@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { playAlertTone, primeAudio } from "@/lib/audio";
+import { requestNotificationPermission, showNotification } from "@/lib/notifications";
 import { useCompleteFocus, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -61,6 +62,12 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     setIsActive(false);
     endTimeRef.current = null;
     playAlertTone();
+    showNotification(
+      mode === "focus" ? "Focus session complete!" : "Break's over",
+      mode === "focus"
+        ? "Nice work — time to log it and take a break."
+        : "Ready for another focus block?",
+    );
     startTitleFlash();
 
     if (mode === "focus") {
@@ -138,6 +145,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     // rebuilds. runId bump guarantees that rebuild even if isActive is unchanged.
     endTimeRef.current = Date.now() + FOCUS_SECONDS * 1000;
     primeAudio();
+    requestNotificationPermission();
     setIsActive(true);
     setRunId((n) => n + 1);
   }, [startToken, stopTitleFlash]);
@@ -151,6 +159,9 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
       // Unlock the AudioContext on the user gesture so the end-of-session
       // alert can play even when no interaction occurs at completion time.
       primeAudio();
+      // Ask for notification permission so we can alert even if the tab is
+      // backgrounded when the timer finishes.
+      requestNotificationPermission();
     }
     setIsActive((prev) => !prev);
   };
