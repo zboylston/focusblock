@@ -65,6 +65,19 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   // True while the textarea is focused, so a background refetch (e.g. on window
   // focus or post-save invalidation) can't overwrite in-progress edits.
   const isEditingNoteRef = useRef(false);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+
+  const autoResizeNote = useCallback(() => {
+    const el = noteRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  // Re-measure whenever the note content changes (typing or server load).
+  useEffect(() => {
+    autoResizeNote();
+  }, [noteDraft, autoResizeNote]);
 
   // Debounce the name so typing a fresh task title char-by-char doesn't fire a
   // lookup per keystroke. Clicking a planner task / running a session keeps the
@@ -509,8 +522,10 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
               </label>
               <Textarea
                 id="focus-note"
+                ref={noteRef}
                 value={noteDraft}
                 onChange={(e) => setNoteDraft(e.target.value)}
+                onInput={autoResizeNote}
                 onFocus={() => {
                   isEditingNoteRef.current = true;
                 }}
@@ -519,8 +534,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
                   void saveNote();
                 }}
                 placeholder="Jot what you're working on…"
-                rows={3}
-                className="resize-none border-border/50 bg-transparent text-sm leading-relaxed placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary"
+                className="resize-none border-border/50 bg-transparent text-sm leading-relaxed placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary min-h-[3.5rem] overflow-hidden"
               />
             </div>
           )}
