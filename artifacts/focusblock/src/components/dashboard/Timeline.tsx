@@ -11,9 +11,26 @@ import {
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Play, Check } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Trash2, Play, Check, ChevronDown, AlignLeft, Link2, ExternalLink, X, Pencil } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+
+// Normalize a user-typed URL (add https:// if no scheme is present).
+function normalizeUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+// Pull a clean hostname (no www.) for display in the link chip.
+function linkHost(url: string): string {
+  try {
+    return new URL(normalizeUrl(url)).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
 
 interface TimelineProps {
   onTaskSelect: (taskName: string) => void;
@@ -26,6 +43,8 @@ type TaskGroup = {
   totalEstimated: number;
   completedCount: number;
   plays: number;
+  description: string | null;
+  link: string | null;
 };
 
 type DaySection = {
@@ -71,6 +90,8 @@ function groupByName(tasks: Task[]): TaskGroup[] {
       totalEstimated: sorted[0].totalChunks,
       completedCount: sorted.filter((b) => b.completed).length,
       plays: sorted[0].plays,
+      description: sorted[0].description ?? null,
+      link: sorted[0].link ?? null,
     };
   });
 }
@@ -203,6 +224,20 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
     }
   };
 
+  // Note/link live on the first block (chunkIndex 1) of a group, like plays.
+  const handleUpdateMeta = async (
+    group: TaskGroup,
+    data: { description?: string; link?: string },
+  ) => {
+    const first = group.blocks[0];
+    try {
+      await updateTask.mutateAsync({ id: first.id, data });
+      refresh();
+    } catch (err) {
+      console.error("Failed to update task note", err);
+    }
+  };
+
   // Infinite scroll: load older days when the sentinel scrolls into view.
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -292,6 +327,7 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
                   onToggleBlock={handleToggleBlock}
                   onPlay={handlePlay}
                   onCompleteAll={handleCompleteAll}
+                  onUpdateMeta={handleUpdateMeta}
                   onDelete={handleDeleteGroup}
                   onSelect={onTaskSelect}
                 />
@@ -321,6 +357,7 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
                       onToggleBlock={handleToggleBlock}
                       onPlay={handlePlay}
                       onCompleteAll={handleCompleteAll}
+                      onUpdateMeta={handleUpdateMeta}
                       onDelete={handleDeleteGroup}
                       onSelect={onTaskSelect}
                     />
@@ -346,14 +383,53 @@ interface TimelineGroupProps {
   onToggleBlock: (block: Task) => void;
   onPlay: (group: TaskGroup) => void;
   onCompleteAll: (group: TaskGroup) => void;
+  onUpdateMeta: (group: TaskGroup, data: { description?: string; link?: string }) => void;
   onDelete: (blocks: Task[]) => void;
   onSelect: (name: string) => void;
 }
 
-function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onDelete, onSelect }: TimelineGroupProps) {
+function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMeta, onDelete, onSelect }: TimelineGroupProps) {
   const allDone = group.completedCount === group.blocks.length;
   const hasPending = !allDone;
   const overEstimate = group.completedCount > group.totalEstimated;
+
+  const hasNote = Boolean(group.description);
+  const hasLink = Boolean(group.link);
+  const hasMeta = hasNote || hasLink;
+
+  const [expanded, setExpanded] = useState(false);
+  const [draftNote, setDraftNote] = useState(group.description ?? "");
+  const [editingLink, setEditingLink] = useState(false);
+  const [draftLink, setDraftLink] = useState(group.link ?? "");
+
+  // Keep local drafts in sync if the group's data changes underneath us.
+  useEffect(() => {
+    setDraftNote(group.description ?? "");
+  }, [group.description]);
+  useEffect(() => {
+    setDraftLink(group.link ?? "");
+  }, [group.link]);
+
+  const saveNote = () => {
+    const next = draftNote.trim();
+    if (next !== (group.description ?? "")) {
+      onUpdateMeta(group, { description: next });
+    }
+  };
+
+  const saveLink = () => {
+    const next = draftLink.trim() ? normalizeUrl(draftLink) : "";
+    setEditingLink(false);
+    if (next !== (group.link ?? "")) {
+      onUpdateMeta(group, { link: next });
+    }
+  };
+
+  const removeLink = () => {
+    setDraftLink("");
+    setEditingLink(false);
+    onUpdateMeta(group, { link: "" });
+  };
 
   // Completed blocks become the day's "log" lines (time · rating · note).
   const completedBlocks = group.blocks
@@ -410,6 +486,18 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onDelete, 
           </span>
         </div>
 
+        <Button
+          variant="ghost"
+          size="icon"
+          title={hasMeta ? "Show note & link" : "Add a note or link"}
+          className={`flex-shrink-0 hover:text-primary hover:bg-primary/10 transition-all ${
+            hasMeta ? "text-primary/70" : "text-muted-foreground/40 opacity-0 group-hover:opacity-100"
+          } ${expanded ? "text-primary" : ""}`}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {hasMeta ? <AlignLeft className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+        </Button>
+
         {hasPending && (
           <>
             <Button
@@ -442,6 +530,110 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onDelete, 
           <Trash2 className="w-4 h-4" />
         </Button>
       </div>
+
+      {/* Faint note preview (collapsed) — click to expand for full context */}
+      {hasMeta && !expanded && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className={`mt-1.5 flex items-center gap-2 text-left text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors w-full ${
+            hasPending ? "pl-[2.1rem]" : "pl-8"
+          }`}
+        >
+          {hasNote ? (
+            <span className="truncate">{group.description}</span>
+          ) : (
+            <span className="flex items-center gap-1.5 truncate text-primary/70">
+              <Link2 className="w-3 h-3 flex-shrink-0" />
+              {linkHost(group.link!)}
+            </span>
+          )}
+          <ChevronDown className="w-3 h-3 flex-shrink-0 opacity-60" />
+        </button>
+      )}
+
+      {/* Expanded note + link editor */}
+      {expanded && (
+        <div className={`mt-2 space-y-2.5 ${hasPending ? "pl-[2.1rem]" : "pl-8"} pr-1`}>
+          <Textarea
+            value={draftNote}
+            onChange={(e) => setDraftNote(e.target.value)}
+            onBlur={saveNote}
+            placeholder="Add a note or plan for this task…"
+            rows={3}
+            className="resize-none bg-card border-border/60 text-sm leading-relaxed placeholder:text-muted-foreground/50 focus-visible:ring-1 focus-visible:ring-primary/30"
+          />
+
+          {/* Link capture */}
+          {group.link && !editingLink ? (
+            <a
+              href={normalizeUrl(group.link)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group/link flex items-center gap-2.5 rounded-lg border border-border/60 bg-card px-3 py-2 transition-colors hover:border-primary/40 hover:bg-muted/40"
+            >
+              <img
+                src={`https://icons.duckduckgo.com/ip3/${linkHost(group.link)}.ico`}
+                alt=""
+                className="w-4 h-4 rounded-sm flex-shrink-0"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-xs font-medium text-foreground truncate">{linkHost(group.link)}</span>
+                <span className="text-[11px] text-muted-foreground truncate">{group.link}</span>
+              </div>
+              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/50 flex-shrink-0 group-hover/link:text-primary transition-colors" />
+              <button
+                type="button"
+                title="Edit link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setDraftLink(group.link ?? "");
+                  setEditingLink(true);
+                }}
+                className="text-muted-foreground/40 hover:text-primary transition-colors flex-shrink-0"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Remove link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  removeLink();
+                }}
+                className="text-muted-foreground/40 hover:text-destructive transition-colors flex-shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </a>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card px-2.5 focus-within:border-primary/40 transition-colors">
+              <Link2 className="w-4 h-4 text-muted-foreground/50 flex-shrink-0" />
+              <Input
+                autoFocus={editingLink}
+                value={draftLink}
+                onChange={(e) => setDraftLink(e.target.value)}
+                onBlur={saveLink}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setDraftLink(group.link ?? "");
+                    setEditingLink(false);
+                  }
+                }}
+                placeholder="Paste a link…"
+                className="h-9 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Completion log lines */}
       {completedBlocks.length > 0 && (

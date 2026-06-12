@@ -10,6 +10,10 @@ export const tasksTable = pgTable("tasks", {
   totalChunks: integer("total_chunks").notNull().default(1),
   completed: boolean("completed").notNull().default(false),
   plays: integer("plays").notNull().default(0),
+  // Task-group metadata (planner note + reference link). Stored on the first
+  // block (chunkIndex 1) of a group, like `plays`.
+  description: text("description"),
+  link: text("link"),
   // Completion metadata. A block becomes "done" either when its focus timer
   // finishes or when it is checked off manually; rating/notes are optional and
   // only attached via the rating step after a timer completion.

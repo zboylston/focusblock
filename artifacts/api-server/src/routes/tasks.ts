@@ -221,6 +221,13 @@ router.patch("/tasks/:id", async (req, res) => {
   if (bodyParsed.data.notes !== undefined) {
     updates.notes = bodyParsed.data.notes;
   }
+  // Empty string clears the task-group note/link (stored as null).
+  if (bodyParsed.data.description !== undefined) {
+    updates.description = bodyParsed.data.description.trim() || null;
+  }
+  if (bodyParsed.data.link !== undefined) {
+    updates.link = bodyParsed.data.link.trim() || null;
+  }
   if (bodyParsed.data.plays !== undefined) {
     updates.plays = bodyParsed.data.plays;
   }

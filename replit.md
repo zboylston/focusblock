@@ -49,6 +49,7 @@ A full-stack time-blocking and focus timer app for deep work. Track 30-minute fo
 - Clicking an uncompleted block pre-fills the timer label; a play button auto-starts a fresh focus block and increments a per-group "plays" counter
 - Inline today summary (blocks today / minutes focused)
 - Live "X chunks until 5 PM EST" counter in the header
+- Per-task note/plan + reference link: add/edit a note and attach a link after creation. Collapsed, they show as a faint one-line preview under the task (click to expand); expanded reveals an inline note textarea (save on blur) and a modern link chip (favicon + hostname, edit/remove) or a paste-a-link input
 
 ## User preferences
 
@@ -61,6 +62,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 - Literal `/tasks/*` routes (`/tasks/timeline`, `/tasks/stats/today`, `/tasks/complete-focus`) must be registered BEFORE `/tasks/:id` to avoid route collision in Express
 - Orval generates `z.date()` (not a string) for `format: date` query params, so the generated `GetTimelineQueryParams` rejects the raw string Express puts in `req.query`. The timeline route validates `before` directly as a `YYYY-MM-DD` string instead of using the generated schema
 - Per-group "plays" are stored on the first block (chunkIndex 1) of a task group; increment via `PATCH /tasks/:id { incrementPlays: 1 }` which is atomic server-side (avoids lost updates from rapid taps) — do not read-modify-write `plays` from the client
+- Per-group `description` (note/plan) and `link` are also stored on the first block (chunkIndex 1), like `plays`; read via `group.blocks[0]` and write via `PATCH /tasks/:id { description, link }`. The PATCH route converts empty/whitespace strings to `null` (so an empty string clears the field). `link` is normalized client-side (https:// prepended if no scheme)
 
 ## Pointers
 

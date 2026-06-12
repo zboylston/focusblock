@@ -17,6 +17,16 @@ export interface Task {
   /** Number of times the timer was triggered for this task group */
   plays: number;
   /**
+     * Task-group note / plan (stored on the first block of the group)
+     * @nullable
+     */
+  description?: string | null;
+  /**
+     * Reference URL attached to the task group
+     * @nullable
+     */
+  link?: string | null;
+  /**
      * Emoji rating: 😩 | 😐 | 🙂 | 🔥
      * @nullable
      */

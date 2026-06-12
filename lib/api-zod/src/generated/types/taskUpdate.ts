@@ -13,6 +13,10 @@ export interface TaskUpdate {
   rating?: TaskUpdateRating;
   /** What was worked on during this block */
   notes?: string;
+  /** Task-group note / plan (empty string clears it) */
+  description?: string;
+  /** Reference URL for the task group (empty string clears it) */
+  link?: string;
   /** @minimum 0 */
   plays?: number;
   /**

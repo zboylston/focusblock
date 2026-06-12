@@ -20,6 +20,16 @@ export interface Task {
   /** Number of times the timer was triggered for this task group */
   plays: number;
   /**
+     * Task-group note / plan (stored on the first block of the group)
+     * @nullable
+     */
+  description?: string | null;
+  /**
+     * Reference URL attached to the task group
+     * @nullable
+     */
+  link?: string | null;
+  /**
      * Emoji rating: 😩 | 😐 | 🙂 | 🔥
      * @nullable
      */
@@ -61,6 +71,10 @@ export interface TaskUpdate {
   rating?: TaskUpdateRating;
   /** What was worked on during this block */
   notes?: string;
+  /** Task-group note / plan (empty string clears it) */
+  description?: string;
+  /** Reference URL for the task group (empty string clears it) */
+  link?: string;
   /** @minimum 0 */
   plays?: number;
   /**
