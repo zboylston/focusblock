@@ -280,9 +280,12 @@ components:
 
     TodayStats:
       type: object
-      required: [totalBlocks, totalMinutes]
+      required: [totalBlocks, totalMinutes, openPlannedBlocks]
       properties:
         totalBlocks:
           type: integer
         totalMinutes:
           type: integer
+        openPlannedBlocks:
+          type: integer
+          description: Remaining planned focus blocks across all open task groups (any day), clamped per group so over-estimated groups never go negative.

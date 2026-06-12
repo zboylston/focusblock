@@ -49,6 +49,7 @@ A full-stack time-blocking and focus timer app for deep work. Track 30-minute fo
 - Clicking an uncompleted block pre-fills the timer label; a play button auto-starts a fresh focus block and increments a per-group "plays" counter
 - Inline today summary (blocks today / minutes focused)
 - Live "X chunks until 5 PM EST" counter in the header
+- Day-budget meter: compares total remaining planned blocks (summed across ALL open task groups, not just today's — carried-over open tasks still count) against work blocks left until 5 PM. Shows "N to spare" (primary/green) or "N over" (destructive/red) with a comparison bar (planned fill + hairline capacity marker). Capacity comes from the shared `useChunksLeft` hook
 - Per-task note/plan + reference link: add/edit a note and attach a link after creation. Collapsed, they show as a faint one-line preview under the task (click to expand); expanded reveals an inline note textarea (save on blur) and a modern link chip (favicon + hostname, edit/remove) or a paste-a-link input
 
 ## User preferences

@@ -74,7 +74,8 @@ export const GetTimelineResponse = zod.object({
  */
 export const GetTodayStatsResponse = zod.object({
   "totalBlocks": zod.number(),
-  "totalMinutes": zod.number()
+  "totalMinutes": zod.number(),
+  "openPlannedBlocks": zod.number().describe('Remaining planned focus blocks across all open task groups (any day), clamped per group so over-estimated groups never go negative.')
 })
 
 

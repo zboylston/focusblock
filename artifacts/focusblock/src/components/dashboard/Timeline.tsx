@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Play, Check, AlignLeft, Link2, ExternalLink, X, Pencil } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { BudgetMeter } from "./BudgetMeter";
 
 // Normalize a user-typed URL (add https:// if no scheme is present).
 function normalizeUrl(raw: string): string {
@@ -299,6 +300,9 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
             <span className="font-semibold text-foreground tabular-nums">{stats?.totalMinutes ?? 0}</span> min focused
           </span>
         </div>
+
+        {/* Planned work vs. time left in the day */}
+        <BudgetMeter plannedRemaining={stats?.openPlannedBlocks ?? 0} />
       </div>
 
       {isLoading ? (

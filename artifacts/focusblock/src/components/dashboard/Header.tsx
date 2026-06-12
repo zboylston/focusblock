@@ -1,34 +1,8 @@
-import { useState, useEffect } from "react";
 import { Clock } from "lucide-react";
+import { useChunksLeft } from "@/hooks/use-chunks-left";
 
 export function Header() {
-  const [chunksLeft, setChunksLeft] = useState<number>(0);
-
-  useEffect(() => {
-    const calculateChunksLeft = () => {
-      const now = new Date();
-
-      // Shift "now" into Eastern wall-clock time so both the current time and
-      // the 5 PM target live in the same frame; their difference is then the
-      // real time remaining. America/New_York handles DST automatically.
-      const eastern = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
-      const target = new Date(eastern);
-      target.setHours(17, 0, 0, 0); // 5 PM Eastern
-
-      const diffMs = target.getTime() - eastern.getTime();
-
-      if (diffMs <= 0) {
-        setChunksLeft(0);
-      } else {
-        // A chunk is 30 mins focus + 5 mins break = 35 mins.
-        setChunksLeft(Math.floor(diffMs / (1000 * 60 * 35)));
-      }
-    };
-
-    calculateChunksLeft();
-    const interval = setInterval(calculateChunksLeft, 60000);
-    return () => clearInterval(interval);
-  }, []);
+  const chunksLeft = useChunksLeft();
 
   return (
     <header className="w-full bg-card border-b border-border px-6 py-4 flex items-center justify-between sticky top-0 z-10">

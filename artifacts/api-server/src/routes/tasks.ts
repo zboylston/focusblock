@@ -129,7 +129,28 @@ router.get("/tasks/stats/today", async (_req, res) => {
     .where(and(eq(tasksTable.date, today), eq(tasksTable.completed, true)));
 
   const totalBlocks = rows.length;
-  res.json({ totalBlocks, totalMinutes: totalBlocks * 30 });
+
+  // Remaining planned blocks across ALL open task groups (any day), so the day
+  // budget reflects every pending block — not just the days the client has
+  // paged in. Aggregate per (name, date) group, mirroring the frontend's
+  // per-group clamp so over-estimated groups never subtract from the total.
+  const openPlannedRows = await db.execute(sql`
+    SELECT COALESCE(SUM(GREATEST(0, total_chunks - completed_count)), 0)::int AS open_planned
+    FROM (
+      SELECT
+        MAX(total_chunks) AS total_chunks,
+        COUNT(*) FILTER (WHERE completed) AS completed_count,
+        COUNT(*) AS block_count
+      FROM tasks
+      GROUP BY name, date
+    ) g
+    WHERE g.completed_count < g.block_count
+  `);
+  const openPlannedBlocks = Number(
+    (openPlannedRows.rows[0] as { open_planned: number } | undefined)?.open_planned ?? 0,
+  );
+
+  res.json({ totalBlocks, totalMinutes: totalBlocks * 30, openPlannedBlocks });
 });
 
 // POST /tasks/complete-focus — mark the next open block for a name done.
