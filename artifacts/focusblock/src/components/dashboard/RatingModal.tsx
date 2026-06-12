@@ -5,9 +5,16 @@ import { Plus, Coffee } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type Rating = "😩" | "😐" | "🙂" | "🔥";
 const RATINGS: Rating[] = ["😩", "😐", "🙂", "🔥"];
+const RATING_LABELS: Record<Rating, string> = {
+  "😩": "rough",
+  "😐": "okay",
+  "🙂": "good",
+  "🔥": "great",
+};
 
 interface RatingModalProps {
   taskId: number;
@@ -22,8 +29,6 @@ export function RatingModal({ taskId, onComplete, onAddBlock }: RatingModalProps
   const updateTask = useUpdateTask();
   const queryClient = useQueryClient();
 
-  // Persist whatever rating/notes the user entered for the just-completed block,
-  // then run the chosen next action (take a break vs. keep going).
   const saveAnd = async (next: () => void) => {
     if (saving) return;
     setSaving(true);
@@ -46,6 +51,8 @@ export function RatingModal({ taskId, onComplete, onAddBlock }: RatingModalProps
     }
   };
 
+  const ratingIndex = rating ? RATINGS.indexOf(rating) : -1;
+
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onComplete()}>
       <DialogContent className="sm:max-w-md text-center p-8">
@@ -56,24 +63,33 @@ export function RatingModal({ taskId, onComplete, onAddBlock }: RatingModalProps
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-4 gap-3 mt-4">
-          {RATINGS.map((r) => (
-            <button
-              key={r}
-              onClick={() => setRating((prev) => (prev === r ? null : r))}
-              className={`text-5xl transition-all active:scale-95 rounded-2xl p-4 ${
-                rating === r
-                  ? "bg-primary/15 ring-2 ring-primary scale-105"
-                  : "bg-muted/30 hover:bg-muted/60 hover:scale-110"
-              }`}
-            >
-              {r}
-            </button>
-          ))}
+        <div className="flex flex-col items-center gap-4 mt-6">
+          <div className="flex items-center gap-3">
+            {RATINGS.map((r, i) => (
+              <button
+                key={r}
+                onClick={() => setRating((prev) => (prev === r ? null : r))}
+                title={RATING_LABELS[r]}
+                aria-label={RATING_LABELS[r]}
+                className={cn(
+                  "w-7 h-7 rounded-full border-2 transition-all focus:outline-none",
+                  ratingIndex >= i
+                    ? "bg-primary border-primary"
+                    : "bg-transparent border-border/50 hover:border-primary/50",
+                  rating === r && "scale-110",
+                )}
+              />
+            ))}
+          </div>
+          {rating && (
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              {RATING_LABELS[rating]}
+            </span>
+          )}
         </div>
 
         <Textarea
-          className="mt-4 resize-none text-sm"
+          className="mt-6 resize-none text-sm"
           rows={3}
           placeholder="What did you work on? (optional)"
           value={notes}

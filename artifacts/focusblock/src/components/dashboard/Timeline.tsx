@@ -18,6 +18,28 @@ import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { BudgetMeter } from "./BudgetMeter";
 import { normalizeUrl, linkHost } from "@/lib/url";
+import { cn } from "@/lib/utils";
+
+type Rating = "😩" | "😐" | "🙂" | "🔥";
+const RATINGS: Rating[] = ["😩", "😐", "🙂", "🔥"];
+
+function RatingDots({ rating }: { rating: string }) {
+  const idx = RATINGS.indexOf(rating as Rating);
+  if (idx === -1) return null;
+  return (
+    <span className="flex items-center gap-0.5 shrink-0">
+      {RATINGS.map((_, i) => (
+        <span
+          key={i}
+          className={cn(
+            "inline-block w-1.5 h-1.5 rounded-full",
+            i <= idx ? "bg-primary/70" : "bg-border",
+          )}
+        />
+      ))}
+    </span>
+  );
+}
 
 interface TimelineProps {
   onTaskSelect: (taskName: string) => void;
@@ -723,7 +745,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               <span className="font-mono tabular-nums whitespace-nowrap">
                 {format(new Date(block.completedAt!), "h:mm a")}
               </span>
-              {block.rating && <span className="leading-none">{block.rating}</span>}
+              {block.rating && <RatingDots rating={block.rating} />}
               {block.notes && <span className="leading-relaxed">{block.notes}</span>}
             </div>
           ))}
