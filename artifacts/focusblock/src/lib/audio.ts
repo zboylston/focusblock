@@ -1,4 +1,14 @@
 let ctx: AudioContext | null = null;
+let alarmInterval: ReturnType<typeof setInterval> | null = null;
+let alarmTimeout: ReturnType<typeof setTimeout> | null = null;
+// Bumped on every start/stop so a deferred resume() can't ring after a stop.
+let alarmGen = 0;
+
+// Keep ringing until acknowledged, but never longer than a minute so a missed
+// alert doesn't beep forever.
+const ALARM_DURATION_MS = 60_000;
+// Gap between repeats. The beep cluster is ~0.8s, so this leaves a short pause.
+const ALARM_INTERVAL_MS = 1200;
 
 function getCtx(): AudioContext {
   if (!ctx) {
@@ -33,16 +43,44 @@ const beep = (c: AudioContext, startTime: number, freq: number, duration: number
   osc.stop(startTime + duration);
 };
 
-export const playAlertTone = () => {
+const ringOnce = () => {
   try {
     const c = getCtx();
     if (c.state === "suspended") {
-      c.resume().then(() => scheduleBeeps(c));
+      const gen = alarmGen;
+      c.resume()
+        .then(() => {
+          // Skip if the alarm was stopped while resume() was pending.
+          if (gen === alarmGen) scheduleBeeps(c);
+        })
+        .catch(() => {});
     } else {
       scheduleBeeps(c);
     }
   } catch (err) {
     console.error("Audio playback failed", err);
+  }
+};
+
+// Start the end-of-session alarm: ring immediately, then repeat until either
+// stopAlertTone() is called (user acknowledges) or a minute has elapsed.
+export const playAlertTone = () => {
+  stopAlertTone();
+  ringOnce();
+  alarmInterval = setInterval(ringOnce, ALARM_INTERVAL_MS);
+  alarmTimeout = setTimeout(stopAlertTone, ALARM_DURATION_MS);
+};
+
+// Silence a ringing alarm. Safe to call any time (idempotent).
+export const stopAlertTone = () => {
+  alarmGen++;
+  if (alarmInterval !== null) {
+    clearInterval(alarmInterval);
+    alarmInterval = null;
+  }
+  if (alarmTimeout !== null) {
+    clearTimeout(alarmTimeout);
+    alarmTimeout = null;
   }
 };
 

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { playAlertTone, primeAudio } from "@/lib/audio";
+import { playAlertTone, stopAlertTone, primeAudio } from "@/lib/audio";
 import { requestNotificationPermission, showNotification } from "@/lib/notifications";
 import {
   useCompleteFocus,
@@ -159,6 +159,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
         queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
       } catch (err) {
         console.error("Failed to complete focus block", err);
+        stopAlertTone();
         stopTitleFlash();
         setTimeLeft(FOCUS_SECONDS);
         toast({
@@ -202,6 +203,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   // Clean up any running intervals and restore the tab title on unmount.
   useEffect(() => {
     return () => {
+      stopAlertTone();
       if (timerRef.current) clearInterval(timerRef.current);
       if (titleFlashRef.current) clearInterval(titleFlashRef.current);
       document.title = originalTitle.current;
@@ -214,6 +216,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   useEffect(() => {
     if (startToken === prevStartToken.current) return;
     prevStartToken.current = startToken;
+    stopAlertTone();
     stopTitleFlash();
     setShowRatingModal(false);
     setMode("focus");
@@ -229,6 +232,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   }, [startToken, stopTitleFlash]);
 
   const toggleTimer = () => {
+    stopAlertTone();
     if (!isActive && mode === "focus" && !activeTaskName.trim()) return;
     if (isActive) {
       // Pausing: freeze the remaining time by dropping the target timestamp.
@@ -245,12 +249,14 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   };
 
   const resetTimer = () => {
+    stopAlertTone();
     setIsActive(false);
     endTimeRef.current = null;
     setTimeLeft(mode === "focus" ? FOCUS_SECONDS : BREAK_SECONDS);
   };
 
   const switchMode = (next: TimerMode) => {
+    stopAlertTone();
     setIsActive(false);
     endTimeRef.current = null;
     setMode(next);
@@ -258,6 +264,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   };
 
   const handleRatingComplete = () => {
+    stopAlertTone();
     setShowRatingModal(false);
     stopTitleFlash();
     setMode("break");
