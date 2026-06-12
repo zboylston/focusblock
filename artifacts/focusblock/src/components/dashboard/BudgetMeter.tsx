@@ -37,7 +37,7 @@ export function BudgetMeter({ plannedRemaining }: BudgetMeterProps) {
       </div>
       <p className="mt-1.5 text-xs text-muted-foreground/80">
         <span className="tabular-nums">{plannedRemaining}</span> planned ·{" "}
-        <span className="tabular-nums">{capacity}</span> left ·{" "}
+        <span className="tabular-nums">{capacity}</span> left until 5 PM EST ·{" "}
         <span className={over ? "text-destructive" : "text-primary"}>
           {plannedRemaining === 0
             ? "nothing planned"
