@@ -30,6 +30,11 @@ export interface Task {
      */
   link?: string | null;
   /**
+     * Current sub-focus within the task group (stored on the first block)
+     * @nullable
+     */
+  subtask?: string | null;
+  /**
      * Emoji rating: 😩 | 😐 | 🙂 | 🔥
      * @nullable
      */
@@ -75,6 +80,8 @@ export interface TaskUpdate {
   description?: string;
   /** Reference URL for the task group (empty string clears it) */
   link?: string;
+  /** Current sub-focus within the task group (empty string clears it) */
+  subtask?: string;
   /** @minimum 0 */
   plays?: number;
   /**
@@ -131,6 +138,11 @@ export interface TaskGroupContext {
      * @nullable
      */
   link?: string | null;
+  /**
+     * Current sub-focus within the task group
+     * @nullable
+     */
+  subtask?: string | null;
 }
 
 export interface AddBlockInput {

@@ -295,6 +295,9 @@ components:
         link:
           type: ["string", "null"]
           description: "Reference URL attached to the task group"
+        subtask:
+          type: ["string", "null"]
+          description: "Current sub-focus within the task group (stored on the first block)"
         rating:
           type: ["string", "null"]
           description: "Emoji rating: 😩 | 😐 | 🙂 | 🔥"
@@ -342,6 +345,9 @@ components:
         link:
           type: string
           description: "Reference URL for the task group (empty string clears it)"
+        subtask:
+          type: string
+          description: "Current sub-focus within the task group (empty string clears it)"
         plays:
           type: integer
           minimum: 0
@@ -406,6 +412,9 @@ components:
         link:
           type: ["string", "null"]
           description: Reference URL attached to the task group
+        subtask:
+          type: ["string", "null"]
+          description: Current sub-focus within the task group
 
     AddBlockInput:
       type: object

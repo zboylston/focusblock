@@ -363,6 +363,7 @@ router.get("/tasks/group", async (req, res) => {
     completedCount,
     description: first?.description ?? null,
     link: first?.link ?? null,
+    subtask: first?.subtask ?? null,
   });
 });
 
@@ -449,6 +450,10 @@ router.patch("/tasks/:id", async (req, res) => {
   }
   if (bodyParsed.data.link !== undefined) {
     updates.link = bodyParsed.data.link.trim() || null;
+  }
+  // Empty string clears the current sub-focus (stored as null).
+  if (bodyParsed.data.subtask !== undefined) {
+    updates.subtask = bodyParsed.data.subtask.trim() || null;
   }
   if (bodyParsed.data.plays !== undefined) {
     updates.plays = bodyParsed.data.plays;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, RotateCcw, Plus, ExternalLink } from "lucide-react";
+import { Play, Pause, RotateCcw, Plus, ExternalLink, CornerDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -78,6 +78,12 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   useEffect(() => {
     autoResizeNote();
   }, [noteDraft, autoResizeNote]);
+
+  // Current sub-focus ("what I'm on right now") within the active task group.
+  // Stored on the group's first block (chunkIndex 1), like description/link.
+  const [subtaskDraft, setSubtaskDraft] = useState("");
+  const loadedSubtaskRef = useRef("");
+  const isEditingSubtaskRef = useRef(false);
 
   // Debounce the name so typing a fresh task title char-by-char doesn't fire a
   // lookup per keystroke. Clicking a planner task / running a session keeps the
@@ -184,6 +190,16 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     }
   }, [noteName]);
 
+  // Sync the sub-focus draft when the resolved group changes (task switched,
+  // refetched, or cleared). Never clobber what the user is actively typing.
+  const groupSubtask = group?.subtask;
+  useEffect(() => {
+    if (isEditingSubtaskRef.current) return;
+    const text = groupSubtask ?? "";
+    loadedSubtaskRef.current = text;
+    setSubtaskDraft(text);
+  }, [groupSubtask]);
+
   const saveNote = useCallback(async () => {
     const name = activeTaskName.trim();
     if (!name) return;
@@ -205,6 +221,29 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
       });
     }
   }, [activeTaskName, noteDraft, updateTaskNote, queryClient, toast]);
+
+  // Persist the sub-focus onto the group's first block via PATCH. Empty string
+  // clears it server-side (trimmed to null), like description/link.
+  const saveSubtask = useCallback(async () => {
+    const blockId = group?.blocks[0]?.id;
+    if (!blockId) return;
+    if (subtaskDraft.trim() === loadedSubtaskRef.current.trim()) return;
+    try {
+      const result = await updateTask.mutateAsync({
+        id: blockId,
+        data: { subtask: subtaskDraft },
+      });
+      loadedSubtaskRef.current = result.subtask ?? "";
+      queryClient.invalidateQueries({ queryKey: getGetTaskGroupQueryKey({ name: noteName }) });
+    } catch (err) {
+      console.error("Failed to save sub-focus", err);
+      toast({
+        title: "Couldn't save your focus",
+        description: "Something went wrong saving this. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [group, subtaskDraft, updateTask, queryClient, noteName, toast]);
 
   const stopTitleFlash = useCallback(() => {
     if (titleFlashRef.current) {
@@ -426,6 +465,33 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
               </div>
             )}
           </div>
+
+          {mode === "focus" && hasGroup && group && (
+            <div className="w-full max-w-xs -mt-5 mb-8 flex items-center justify-center gap-1.5">
+              <CornerDownRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/40" />
+              <input
+                value={subtaskDraft}
+                onChange={(e) => setSubtaskDraft(e.target.value)}
+                onFocus={() => {
+                  isEditingSubtaskRef.current = true;
+                }}
+                onBlur={() => {
+                  isEditingSubtaskRef.current = false;
+                  void saveSubtask();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.currentTarget.blur();
+                  } else if (e.key === "Escape") {
+                    setSubtaskDraft(loadedSubtaskRef.current);
+                    e.currentTarget.blur();
+                  }
+                }}
+                placeholder="add current focus"
+                className="min-w-0 flex-1 border-b border-transparent bg-transparent text-center text-sm text-muted-foreground transition-colors placeholder:text-muted-foreground/40 focus:border-border/60 focus:text-foreground focus:outline-none"
+              />
+            </div>
+          )}
 
           <div className="text-7xl md:text-8xl font-mono font-bold tracking-tighter text-foreground mb-10 tabular-nums">
             {timeString}

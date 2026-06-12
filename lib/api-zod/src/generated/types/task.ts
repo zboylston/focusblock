@@ -27,6 +27,11 @@ export interface Task {
      */
   link?: string | null;
   /**
+     * Current sub-focus within the task group (stored on the first block)
+     * @nullable
+     */
+  subtask?: string | null;
+  /**
      * Emoji rating: 😩 | 😐 | 🙂 | 🔥
      * @nullable
      */

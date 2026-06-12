@@ -29,4 +29,9 @@ export interface TaskGroupContext {
      * @nullable
      */
   link?: string | null;
+  /**
+     * Current sub-focus within the task group
+     * @nullable
+     */
+  subtask?: string | null;
 }

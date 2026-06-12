@@ -17,6 +17,8 @@ export interface TaskUpdate {
   description?: string;
   /** Reference URL for the task group (empty string clears it) */
   link?: string;
+  /** Current sub-focus within the task group (empty string clears it) */
+  subtask?: string;
   /** @minimum 0 */
   plays?: number;
   /**

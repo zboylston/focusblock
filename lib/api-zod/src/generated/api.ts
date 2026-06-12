@@ -58,6 +58,7 @@ export const GetTimelineResponse = zod.object({
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
   "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
@@ -100,6 +101,7 @@ export const CompleteFocusResponse = zod.object({
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
   "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
@@ -166,6 +168,7 @@ export const GetTaskGroupResponse = zod.object({
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
   "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
@@ -174,7 +177,8 @@ export const GetTaskGroupResponse = zod.object({
   "totalEstimated": zod.number().describe('Originally planned block count for the group'),
   "completedCount": zod.number().describe('Number of completed blocks (may exceed totalEstimated when over)'),
   "description": zod.string().nullish().describe('The task-group note \/ plan'),
-  "link": zod.string().nullish().describe('Reference URL attached to the task group')
+  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "subtask": zod.string().nullish().describe('Current sub-focus within the task group')
 })
 
 
@@ -199,6 +203,7 @@ export const AddBlockResponse = zod.object({
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
   "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
@@ -226,6 +231,7 @@ export const UpdateTaskBody = zod.object({
   "notes": zod.string().optional().describe('What was worked on during this block'),
   "description": zod.string().optional().describe('Task-group note \/ plan (empty string clears it)'),
   "link": zod.string().optional().describe('Reference URL for the task group (empty string clears it)'),
+  "subtask": zod.string().optional().describe('Current sub-focus within the task group (empty string clears it)'),
   "plays": zod.number().min(updateTaskBodyPlaysMin).optional(),
   "incrementPlays": zod.number().min(1).optional().describe('Atomically add this many plays to the current value')
 })
@@ -240,6 +246,7 @@ export const UpdateTaskResponse = zod.object({
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
   "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
