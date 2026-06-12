@@ -444,6 +444,21 @@ export function Timer({
     <>
       <Card className="border-border/60 shadow-sm overflow-hidden bg-card">
         <CardContent className="p-8 flex flex-col items-center justify-center relative">
+          {mode === "focus" && trimmedName && (
+            <button
+              type="button"
+              onClick={() => onExpandedChange(!expanded)}
+              title={expanded ? "Collapse scratchpad" : "Expand scratchpad"}
+              aria-label={expanded ? "Collapse scratchpad" : "Expand scratchpad"}
+              className="absolute top-3 right-3 text-muted-foreground/40 hover:text-foreground transition-colors focus:outline-none"
+            >
+              {expanded ? (
+                <Minimize2 className="w-4 h-4" />
+              ) : (
+                <Maximize2 className="w-4 h-4" />
+              )}
+            </button>
+          )}
           <div className="flex gap-2 bg-muted/50 p-1 rounded-full mb-8">
             <button
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${mode === "focus" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
@@ -599,23 +614,10 @@ export function Timer({
                 expanded ? "max-w-2xl" : "max-w-xs",
               )}
             >
-              <div className="flex items-center justify-between mb-2">
+              <div className="mb-2">
                 <span className="block text-[0.7rem] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
                   Notes
                 </span>
-                <button
-                  type="button"
-                  onClick={() => onExpandedChange(!expanded)}
-                  title={expanded ? "Collapse scratchpad" : "Expand scratchpad"}
-                  aria-label={expanded ? "Collapse scratchpad" : "Expand scratchpad"}
-                  className="text-muted-foreground/50 hover:text-foreground transition-colors focus:outline-none"
-                >
-                  {expanded ? (
-                    <Minimize2 className="w-3.5 h-3.5" />
-                  ) : (
-                    <Maximize2 className="w-3.5 h-3.5" />
-                  )}
-                </button>
               </div>
               <MarkdownEditor
                 value={noteDraft}
