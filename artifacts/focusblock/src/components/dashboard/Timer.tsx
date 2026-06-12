@@ -267,6 +267,8 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     stopAlertTone();
     setShowRatingModal(false);
     stopTitleFlash();
+    // Clear the focus label so the finished task's title doesn't linger.
+    onTaskNameChange("");
     setMode("break");
     setTimeLeft(BREAK_SECONDS);
     endTimeRef.current = null;
