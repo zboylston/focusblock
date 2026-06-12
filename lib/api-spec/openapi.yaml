@@ -215,6 +215,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/Task"
 
+  /tasks/rename:
+    post:
+      operationId: renameTaskGroup
+      tags: [tasks]
+      summary: Rename a task group
+      description: >-
+        Renames every block of the (name, date) group to a new name. Rejects with
+        409 when a different group already uses the new name on that date, since
+        merging the two would collide their chunk indices.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameTaskGroupInput"
+      responses:
+        "200":
+          description: The renamed group's blocks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+        "404":
+          description: No group found for that name and date
+        "409":
+          description: A group with the new name already exists on that date
+
   /tasks/{id}:
     patch:
       operationId: updateTask
@@ -423,6 +452,23 @@ components:
         name:
           type: string
           minLength: 1
+
+    RenameTaskGroupInput:
+      type: object
+      required: [name, date, newName]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Current task-group name
+        date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Calendar day (YYYY-MM-DD) of the group to rename
+        newName:
+          type: string
+          minLength: 1
+          description: New task-group name
 
     TimelinePage:
       type: object

@@ -26,6 +26,7 @@ import type {
   GetTaskNoteParams,
   GetTimelineParams,
   HealthStatus,
+  RenameTaskGroupInput,
   Task,
   TaskGroupContext,
   TaskInput,
@@ -745,6 +746,78 @@ export const useAddBlock = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getAddBlockMutationOptions(options));
+    }
+
+export const getRenameTaskGroupUrl = () => {
+
+
+
+
+  return `/api/tasks/rename`
+}
+
+/**
+ * Renames every block of the (name, date) group to a new name. Rejects with 409 when a different group already uses the new name on that date, since merging the two would collide their chunk indices.
+ * @summary Rename a task group
+ */
+export const renameTaskGroup = async (renameTaskGroupInput: RenameTaskGroupInput, options?: RequestInit): Promise<Task[]> => {
+
+  return customFetch<Task[]>(getRenameTaskGroupUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      renameTaskGroupInput,)
+  }
+);}
+
+
+
+
+export const getRenameTaskGroupMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renameTaskGroup>>, TError,{data: BodyType<RenameTaskGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof renameTaskGroup>>, TError,{data: BodyType<RenameTaskGroupInput>}, TContext> => {
+
+const mutationKey = ['renameTaskGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof renameTaskGroup>>, {data: BodyType<RenameTaskGroupInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  renameTaskGroup(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RenameTaskGroupMutationResult = NonNullable<Awaited<ReturnType<typeof renameTaskGroup>>>
+    export type RenameTaskGroupMutationBody = BodyType<RenameTaskGroupInput>
+    export type RenameTaskGroupMutationError = ErrorType<void>
+
+    /**
+ * @summary Rename a task group
+ */
+export const useRenameTaskGroup = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renameTaskGroup>>, TError,{data: BodyType<RenameTaskGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof renameTaskGroup>>,
+        TError,
+        {data: BodyType<RenameTaskGroupInput>},
+        TContext
+      > => {
+      return useMutation(getRenameTaskGroupMutationOptions(options));
     }
 
 export const getUpdateTaskUrl = (id: number,) => {

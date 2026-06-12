@@ -212,6 +212,40 @@ export const AddBlockResponse = zod.object({
 
 
 /**
+ * Renames every block of the (name, date) group to a new name. Rejects with 409 when a different group already uses the new name on that date, since merging the two would collide their chunk indices.
+ * @summary Rename a task group
+ */
+
+export const renameTaskGroupBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+
+export const RenameTaskGroupBody = zod.object({
+  "name": zod.string().min(1).describe('Current task-group name'),
+  "date": zod.string().regex(renameTaskGroupBodyDateRegExp).describe('Calendar day (YYYY-MM-DD) of the group to rename'),
+  "newName": zod.string().min(1).describe('New task-group name')
+})
+
+export const RenameTaskGroupResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "date": zod.coerce.date(),
+  "chunkIndex": zod.number().describe('1-based index within its block group'),
+  "totalChunks": zod.number(),
+  "completed": zod.boolean(),
+  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
+  "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
+  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this block'),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const RenameTaskGroupResponse = zod.array(RenameTaskGroupResponseItem)
+
+
+/**
  * Mark a task done, rename it, attach a rating/notes, or adjust plays
  * @summary Update a task
  */

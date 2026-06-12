@@ -12,6 +12,7 @@ export * from './getTaskGroupParams';
 export * from './getTaskNoteParams';
 export * from './getTimelineParams';
 export * from './healthStatus';
+export * from './renameTaskGroupInput';
 export * from './task';
 export * from './taskGroupContext';
 export * from './taskInput';

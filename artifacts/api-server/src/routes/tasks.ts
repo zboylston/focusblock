@@ -8,6 +8,7 @@ import {
   UpdateTaskNoteBody,
   GetTaskGroupQueryParams,
   AddBlockBody,
+  RenameTaskGroupBody,
   UpdateTaskParams,
   UpdateTaskBody,
   DeleteTaskParams,
@@ -58,7 +59,15 @@ router.post("/tasks", async (req, res) => {
     completed: false,
   }));
 
-  const created = await db.insert(tasksTable).values(insertValues).returning();
+  // Hold the name's advisory lock while inserting so this create is serialized
+  // with the other name-domain writers (append/complete-focus/rename). Without
+  // it, a concurrent create or rename targeting the same name could mint
+  // duplicate chunk indices or merge two groups (there is no DB uniqueness
+  // constraint on (name, date, chunkIndex)).
+  const created = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${name}))`);
+    return tx.insert(tasksTable).values(insertValues).returning();
+  });
 
   res.status(201).json(created.map(serializeTask));
 });
@@ -414,6 +423,85 @@ router.post("/tasks/add-block", async (req, res) => {
   });
 
   res.json(serializeTask(created));
+});
+
+// POST /tasks/rename — rename every block of a (name, date) group to a new
+// name. Registered before /tasks/:id (literal path takes precedence). Rejects
+// with 409 if a different group already uses the new name on that date, since
+// merging the two would collide their chunk indices.
+router.post("/tasks/rename", async (req, res) => {
+  const parsed = RenameTaskGroupBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+
+  const { name, date } = parsed.data;
+  const newName = parsed.data.newName.trim();
+  if (!newName) {
+    res.status(400).json({ error: "New name is required" });
+    return;
+  }
+
+  // No-op rename (same name): just return the group's current blocks.
+  if (newName === name) {
+    const blocks = await db
+      .select()
+      .from(tasksTable)
+      .where(and(eq(tasksTable.name, name), eq(tasksTable.date, date)))
+      .orderBy(asc(tasksTable.chunkIndex));
+    if (blocks.length === 0) {
+      res.status(404).json({ error: "Task not found" });
+      return;
+    }
+    res.json(blocks.map(serializeTask));
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    // Lock both name domains (ordered, to avoid deadlocks) so a concurrent
+    // append/rename touching either name is serialized with this rename. This
+    // mirrors the hashtext(name) advisory-lock discipline used by the append
+    // paths, which guard chunkIndex integrity.
+    const [lo, hi] = [name, newName].sort();
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lo}))`);
+    if (hi !== lo) {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${hi}))`);
+    }
+
+    const existingTarget = await tx
+      .select({ id: tasksTable.id })
+      .from(tasksTable)
+      .where(and(eq(tasksTable.name, newName), eq(tasksTable.date, date)))
+      .limit(1);
+    if (existingTarget.length > 0) {
+      return { conflict: true as const };
+    }
+
+    const updated = await tx
+      .update(tasksTable)
+      .set({ name: newName })
+      .where(and(eq(tasksTable.name, name), eq(tasksTable.date, date)))
+      .returning();
+    return { conflict: false as const, updated };
+  });
+
+  if (result.conflict) {
+    res
+      .status(409)
+      .json({ error: "A task with that name already exists on this day" });
+    return;
+  }
+  if (result.updated.length === 0) {
+    res.status(404).json({ error: "Task not found" });
+    return;
+  }
+
+  res.json(
+    result.updated
+      .sort((a, b) => a.chunkIndex - b.chunkIndex)
+      .map(serializeTask),
+  );
 });
 
 // PATCH /tasks/:id

@@ -150,6 +150,24 @@ export interface AddBlockInput {
   name: string;
 }
 
+export interface RenameTaskGroupInput {
+  /**
+     * Current task-group name
+     * @minLength 1
+     */
+  name: string;
+  /**
+     * Calendar day (YYYY-MM-DD) of the group to rename
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  date: string;
+  /**
+     * New task-group name
+     * @minLength 1
+     */
+  newName: string;
+}
+
 export interface TimelinePage {
   tasks: Task[];
   /**

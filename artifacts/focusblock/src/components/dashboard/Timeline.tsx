@@ -3,6 +3,7 @@ import {
   useCreateTasks,
   useUpdateTask,
   useDeleteTask,
+  useRenameTaskGroup,
   useGetTodayStats,
   getTimeline,
   getGetTodayStatsQueryKey,
@@ -109,6 +110,7 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
   const createTasks = useCreateTasks();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const renameTaskGroup = useRenameTaskGroup();
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["timeline"] });
@@ -207,6 +209,25 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
       refresh();
     } catch (err) {
       console.error("Failed to delete task group", err);
+    }
+  };
+
+  // Rename every block of a (name, date) group in one atomic server call.
+  const handleRename = async (group: TaskGroup, newName: string) => {
+    const next = newName.trim();
+    if (!next || next === group.name) return;
+    try {
+      await renameTaskGroup.mutateAsync({
+        data: { name: group.name, date: group.blocks[0].date, newName: next },
+      });
+      refresh();
+    } catch (err) {
+      console.error("Failed to rename task", err);
+      toast({
+        title: "Couldn't rename this task",
+        description: "A task with that name may already exist on this day.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -317,6 +338,7 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
                   onPlay={handlePlay}
                   onCompleteAll={handleCompleteAll}
                   onUpdateMeta={handleUpdateMeta}
+                  onRename={handleRename}
                   onDelete={handleDeleteGroup}
                   onSelect={onTaskSelect}
                 />
@@ -347,6 +369,7 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
                       onPlay={handlePlay}
                       onCompleteAll={handleCompleteAll}
                       onUpdateMeta={handleUpdateMeta}
+                      onRename={handleRename}
                       onDelete={handleDeleteGroup}
                       onSelect={onTaskSelect}
                     />
@@ -373,11 +396,12 @@ interface TimelineGroupProps {
   onPlay: (group: TaskGroup) => void;
   onCompleteAll: (group: TaskGroup) => void;
   onUpdateMeta: (group: TaskGroup, data: { description?: string; link?: string }) => void;
+  onRename: (group: TaskGroup, newName: string) => void;
   onDelete: (blocks: Task[]) => void;
   onSelect: (name: string) => void;
 }
 
-function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMeta, onDelete, onSelect }: TimelineGroupProps) {
+function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMeta, onRename, onDelete, onSelect }: TimelineGroupProps) {
   const allDone = group.completedCount === group.blocks.length;
   const hasPending = !allDone;
   const overEstimate = group.completedCount > group.totalEstimated;
@@ -390,6 +414,8 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
   const [draftNote, setDraftNote] = useState(group.description ?? "");
   const [editingLink, setEditingLink] = useState(false);
   const [draftLink, setDraftLink] = useState(group.link ?? "");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(group.name);
 
   // Keep local drafts in sync if the group's data changes underneath us.
   useEffect(() => {
@@ -398,6 +424,37 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
   useEffect(() => {
     setDraftLink(group.link ?? "");
   }, [group.link]);
+  useEffect(() => {
+    setDraftTitle(group.name);
+  }, [group.name]);
+
+  // Enter fires commitTitle and then the unmount fires onBlur → guard so the
+  // rename only goes out once.
+  const titleCommittedRef = useRef(false);
+
+  const beginEditTitle = () => {
+    titleCommittedRef.current = false;
+    setDraftTitle(group.name);
+    setEditingTitle(true);
+  };
+
+  const commitTitle = () => {
+    if (titleCommittedRef.current) return;
+    titleCommittedRef.current = true;
+    setEditingTitle(false);
+    const next = draftTitle.trim();
+    if (!next || next === group.name) {
+      setDraftTitle(group.name);
+      return;
+    }
+    onRename(group, next);
+  };
+
+  const cancelTitle = () => {
+    titleCommittedRef.current = true;
+    setEditingTitle(false);
+    setDraftTitle(group.name);
+  };
 
   const saveNote = () => {
     const next = draftNote.trim();
@@ -452,13 +509,42 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
           </div>
         )}
 
-        <div
-          className={`flex-1 min-w-0 ${hasPending ? "cursor-pointer" : ""}`}
-          onClick={() => hasPending && onSelect(group.name)}
-        >
-          <span className={`font-medium truncate block ${allDone ? "text-muted-foreground" : "text-foreground"}`}>
-            {group.name}
-          </span>
+        <div className="flex-1 min-w-0">
+          {editingTitle ? (
+            <Input
+              autoFocus
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancelTitle();
+                }
+              }}
+              className="h-7 px-2 py-0 text-sm font-medium"
+            />
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`font-medium truncate ${hasPending ? "cursor-pointer" : ""} ${allDone ? "text-muted-foreground" : "text-foreground"}`}
+                onClick={() => hasPending && onSelect(group.name)}
+              >
+                {group.name}
+              </span>
+              <button
+                type="button"
+                title="Rename task"
+                onClick={beginEditTitle}
+                className="flex-shrink-0 text-muted-foreground/60 hover:text-primary opacity-0 group-hover:opacity-100 transition-all"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </div>
+          )}
           <span className="text-xs text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
             <span>
               {group.completedCount} / {group.totalEstimated} blocks
