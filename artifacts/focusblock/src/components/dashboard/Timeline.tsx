@@ -491,7 +491,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
           size="icon"
           title={hasMeta ? "Show note & link" : "Add a note or link"}
           className={`flex-shrink-0 hover:text-primary hover:bg-primary/10 transition-all ${
-            hasMeta ? "text-primary/70" : "text-muted-foreground/40 opacity-0 group-hover:opacity-100"
+            hasMeta ? "text-primary/70" : "text-muted-foreground/50"
           } ${expanded ? "text-primary" : ""}`}
           onClick={() => setExpanded((v) => !v)}
         >
