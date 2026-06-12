@@ -81,6 +81,7 @@ export function Timer({
   const [subtaskDraft, setSubtaskDraft] = useState("");
   const loadedSubtaskRef = useRef("");
   const isEditingSubtaskRef = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Debounce the name so typing a fresh task title char-by-char doesn't fire a
   // lookup per keystroke. Clicking a planner task / running a session keeps the
@@ -440,10 +441,28 @@ export function Timer({
     }
   }, [timeString, isActive, activeTaskName, showRatingModal]);
 
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        onExpandedChange(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [onExpandedChange]);
+
   return (
     <>
+      <div ref={cardRef}>
       <Card className="border-border/60 shadow-sm overflow-hidden bg-card">
-        <CardContent className="p-8 flex flex-col items-center justify-center relative">
+        <CardContent
+          className="p-8 flex flex-col items-center justify-center relative cursor-default"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && mode === "focus" && trimmedName) {
+              onExpandedChange(!expanded);
+            }
+          }}
+        >
           {mode === "focus" && trimmedName && (
             <button
               type="button"
@@ -641,6 +660,7 @@ export function Timer({
           )}
         </CardContent>
       </Card>
+      </div>
 
       {showRatingModal && completedTaskId && (
         <RatingModal
