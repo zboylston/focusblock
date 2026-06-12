@@ -14,7 +14,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
       <Header />
-      <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 flex flex-col md:flex-row gap-10 items-start">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-4 md:px-12 md:py-8 flex flex-col md:flex-row gap-10 items-start">
         <div
           className={`w-full transition-[flex-basis,max-width] duration-500 ease-out ${
             expanded ? "md:basis-[64%] md:max-w-[64%]" : "md:basis-[42%] md:max-w-[42%]"

@@ -528,9 +528,9 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               className="h-7 px-2 py-0 text-sm font-medium"
             />
           ) : (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-start gap-1.5">
               <span
-                className={`font-medium truncate ${hasPending ? "cursor-pointer" : ""} ${allDone ? "text-muted-foreground" : "text-foreground"}`}
+                className={`font-medium break-words ${hasPending ? "cursor-pointer" : ""} ${allDone ? "text-muted-foreground" : "text-foreground"}`}
                 onClick={() => hasPending && onSelect(group.name)}
               >
                 {group.name}
