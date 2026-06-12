@@ -553,7 +553,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
             />
           ) : (
             <span
-              className={`font-medium break-words ${hasPending ? "cursor-pointer" : ""} ${allDone ? "text-muted-foreground" : "text-foreground"}`}
+              className={`font-medium truncate block ${hasPending ? "cursor-pointer" : ""} ${allDone ? "text-muted-foreground" : "text-foreground"}`}
               onClick={() => hasPending && onSelect(group.name)}
             >
               {group.name}
