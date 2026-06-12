@@ -448,13 +448,21 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
                       key={block.id}
                       onClick={() => toggleBlock(block)}
                       title={block.completed ? "Mark block open" : "Mark block done"}
-                      className={`w-4 h-4 rounded-sm border-2 transition-all hover:scale-110 focus:outline-none ${
+                      className={`w-4 h-4 rounded-[3px] border-2 transition-all hover:scale-110 focus:outline-none ${
                         block.completed
                           ? "bg-primary border-primary"
                           : "bg-transparent border-muted-foreground/40 hover:border-primary/60"
                       }`}
                     />
                   ))}
+                  <button
+                    onClick={() => addExtraBlock(activeTaskName)}
+                    disabled={addBlock.isPending}
+                    title="Add block"
+                    className="w-4 h-4 rounded-[3px] border border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 transition-colors hover:text-primary hover:border-primary/50 focus:outline-none disabled:opacity-40"
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                  </button>
                 </div>
                 <span className="text-xs text-muted-foreground font-mono whitespace-nowrap">
                   {group.completedCount} / {group.totalEstimated} blocks
@@ -488,16 +496,6 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
                 </a>
               )}
 
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-9 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                onClick={() => addExtraBlock(activeTaskName)}
-                disabled={addBlock.isPending}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add block
-              </Button>
             </div>
           )}
 
