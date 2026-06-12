@@ -109,6 +109,35 @@ export interface TaskNoteInput {
   description: string;
 }
 
+export interface TaskGroupContext {
+  name: string;
+  /**
+     * Calendar day of the resolved group (null when no group exists yet)
+     * @nullable
+     */
+  date?: string | null;
+  blocks: Task[];
+  /** Originally planned block count for the group */
+  totalEstimated: number;
+  /** Number of completed blocks (may exceed totalEstimated when over) */
+  completedCount: number;
+  /**
+     * The task-group note / plan
+     * @nullable
+     */
+  description?: string | null;
+  /**
+     * Reference URL attached to the task group
+     * @nullable
+     */
+  link?: string | null;
+}
+
+export interface AddBlockInput {
+  /** @minLength 1 */
+  name: string;
+}
+
 export interface TimelinePage {
   tasks: Task[];
   /**
@@ -140,6 +169,14 @@ limit?: number;
 };
 
 export type GetTaskNoteParams = {
+/**
+ * Task name to look up
+ * @minLength 1
+ */
+name: string;
+};
+
+export type GetTaskGroupParams = {
 /**
  * Task name to look up
  * @minLength 1

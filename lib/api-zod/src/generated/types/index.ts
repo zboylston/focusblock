@@ -6,11 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './addBlockInput';
 export * from './completeFocusInput';
+export * from './getTaskGroupParams';
 export * from './getTaskNoteParams';
 export * from './getTimelineParams';
 export * from './healthStatus';
 export * from './task';
+export * from './taskGroupContext';
 export * from './taskInput';
 export * from './taskNote';
 export * from './taskNoteInput';

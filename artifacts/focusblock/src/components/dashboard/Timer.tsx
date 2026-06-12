@@ -1,17 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, RotateCcw } from "lucide-react";
+import { Play, Pause, RotateCcw, Plus, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { playAlertTone, stopAlertTone, primeAudio } from "@/lib/audio";
 import { requestNotificationPermission, showNotification } from "@/lib/notifications";
+import { linkHost, normalizeUrl } from "@/lib/url";
 import {
   useCompleteFocus,
   useGetTaskNote,
   useUpdateTaskNote,
+  useGetTaskGroup,
+  useAddBlock,
+  useUpdateTask,
   getGetTaskNoteQueryKey,
+  getGetTaskGroupQueryKey,
   getGetTodayStatsQueryKey,
+  type Task,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -47,6 +53,8 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   const queryClient = useQueryClient();
   const completeFocus = useCompleteFocus();
   const updateTaskNote = useUpdateTaskNote();
+  const addBlock = useAddBlock();
+  const updateTask = useUpdateTask();
   const { toast } = useToast();
 
   // The active task's note (the same task-group `description` shown in the
@@ -76,6 +84,72 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
         enabled: noteName.length > 0,
       },
     },
+  );
+
+  // The active task's full group context (blocks, estimate vs. actual, link),
+  // resolved by name like the note. Drives the on-card task panel and add-block.
+  const groupQuery = useGetTaskGroup(
+    { name: noteName },
+    {
+      query: {
+        queryKey: getGetTaskGroupQueryKey({ name: noteName }),
+        enabled: noteName.length > 0,
+      },
+    },
+  );
+  const group = groupQuery.data;
+  const hasGroup = !!group && group.blocks.length > 0;
+
+  // Refresh everything that reflects block state after a block change.
+  const refreshTaskState = useCallback(
+    (name: string) => {
+      queryClient.invalidateQueries({ queryKey: ["timeline"] });
+      queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetTaskGroupQueryKey({ name }) });
+    },
+    [queryClient],
+  );
+
+  // Toggle a block done/undone straight from the timer card.
+  const toggleBlock = useCallback(
+    async (block: Task) => {
+      try {
+        await updateTask.mutateAsync({
+          id: block.id,
+          data: { completed: !block.completed },
+        });
+        refreshTaskState(block.name);
+      } catch (err) {
+        console.error("Failed to toggle block", err);
+        toast({
+          title: "Couldn't update that block",
+          description: "Something went wrong. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    [updateTask, refreshTaskState, toast],
+  );
+
+  // Append one extra (open) block to the current task without raising the
+  // estimate, so finishing it shows up as overage.
+  const addExtraBlock = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      try {
+        await addBlock.mutateAsync({ data: { name: trimmed } });
+        refreshTaskState(trimmed);
+      } catch (err) {
+        console.error("Failed to add block", err);
+        toast({
+          title: "Couldn't add a block",
+          description: "Something went wrong. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    [addBlock, refreshTaskState, toast],
   );
 
   // Sync the draft when the resolved note changes (task switched or refetched).
@@ -155,8 +229,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
         });
         setCompletedTaskId(task.id);
         setShowRatingModal(true);
-        queryClient.invalidateQueries({ queryKey: ["timeline"] });
-        queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
+        refreshTaskState(task.name);
       } catch (err) {
         console.error("Failed to complete focus block", err);
         stopAlertTone();
@@ -274,6 +347,20 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     endTimeRef.current = null;
   };
 
+  // "Add another block" from the completion card: append an extra block and stay
+  // on this task with a fresh focus timer (skip the break) so the user can keep
+  // running it. The just-completed block is tracked as overage.
+  const handleKeepGoing = async () => {
+    stopAlertTone();
+    stopTitleFlash();
+    setShowRatingModal(false);
+    await addExtraBlock(activeTaskName);
+    setMode("focus");
+    setTimeLeft(FOCUS_SECONDS);
+    setIsActive(false);
+    endTimeRef.current = null;
+  };
+
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
   const timeString = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
@@ -352,8 +439,70 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
             </Button>
           </div>
 
+          {mode === "focus" && trimmedName && hasGroup && group && (
+            <div className="w-full max-w-xs mt-10 pt-6 border-t border-border/40 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {group.blocks.map((block) => (
+                    <button
+                      key={block.id}
+                      onClick={() => toggleBlock(block)}
+                      title={block.completed ? "Mark block open" : "Mark block done"}
+                      className={`w-4 h-4 rounded-sm border-2 transition-all hover:scale-110 focus:outline-none ${
+                        block.completed
+                          ? "bg-primary border-primary"
+                          : "bg-transparent border-muted-foreground/40 hover:border-primary/60"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground font-mono whitespace-nowrap">
+                  {group.completedCount} / {group.totalEstimated} blocks
+                  {group.completedCount > group.totalEstimated && (
+                    <span className="ml-1 text-amber-500">
+                      +{group.completedCount - group.totalEstimated} over
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {group.link && (
+                <a
+                  href={normalizeUrl(group.link)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-lg border border-border/60 bg-card px-2.5 py-1.5 hover:border-primary/40 transition-colors group/link"
+                >
+                  <img
+                    src={`https://icons.duckduckgo.com/ip3/${linkHost(group.link)}.ico`}
+                    alt=""
+                    className="w-4 h-4 rounded-sm flex-shrink-0"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                  <span className="text-xs font-medium text-foreground truncate flex-1">
+                    {linkHost(group.link)}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />
+                </a>
+              )}
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-9 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                onClick={() => addExtraBlock(activeTaskName)}
+                disabled={addBlock.isPending}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add block
+              </Button>
+            </div>
+          )}
+
           {mode === "focus" && trimmedName && (
-            <div className="w-full max-w-xs mt-10 pt-6 border-t border-border/40">
+            <div className="w-full max-w-xs mt-6 pt-6 border-t border-border/40">
               <label
                 htmlFor="focus-note"
                 className="block text-[0.7rem] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 mb-2"
@@ -384,6 +533,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
         <RatingModal
           taskId={completedTaskId}
           onComplete={handleRatingComplete}
+          onAddBlock={handleKeepGoing}
         />
       )}
     </>

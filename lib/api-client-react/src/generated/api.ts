@@ -20,11 +20,14 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AddBlockInput,
   CompleteFocusInput,
+  GetTaskGroupParams,
   GetTaskNoteParams,
   GetTimelineParams,
   HealthStatus,
   Task,
+  TaskGroupContext,
   TaskInput,
   TaskNote,
   TaskNoteInput,
@@ -585,6 +588,163 @@ export const useUpdateTaskNote = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateTaskNoteMutationOptions(options));
+    }
+
+export const getGetTaskGroupUrl = (params: GetTaskGroupParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/tasks/group?${stringifiedParams}` : `/api/tasks/group`
+}
+
+/**
+ * Returns the active block group for the given name — today's group if it exists, otherwise the most recent group (any day). Includes the group's blocks, the estimated vs. completed counts, and the note/link. Blocks are empty when no group exists yet for the name.
+ * @summary Get a task group's context by name
+ */
+export const getTaskGroup = async (params: GetTaskGroupParams, options?: RequestInit): Promise<TaskGroupContext> => {
+
+  return customFetch<TaskGroupContext>(getGetTaskGroupUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTaskGroupQueryKey = (params?: GetTaskGroupParams,) => {
+    return [
+    `/api/tasks/group`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTaskGroupQueryOptions = <TData = Awaited<ReturnType<typeof getTaskGroup>>, TError = ErrorType<unknown>>(params: GetTaskGroupParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTaskGroup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTaskGroupQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTaskGroup>>> = ({ signal }) => getTaskGroup(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskGroup>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTaskGroupQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskGroup>>>
+export type GetTaskGroupQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a task group's context by name
+ */
+
+export function useGetTaskGroup<TData = Awaited<ReturnType<typeof getTaskGroup>>, TError = ErrorType<unknown>>(
+ params: GetTaskGroupParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTaskGroup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTaskGroupQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAddBlockUrl = () => {
+
+
+
+
+  return `/api/tasks/add-block`
+}
+
+/**
+ * Adds one more open block to today's group for the given name without changing the estimate, so completing it beyond the plan shows up as overage. Returns the created block.
+ * @summary Append an extra open block to a task group
+ */
+export const addBlock = async (addBlockInput: AddBlockInput, options?: RequestInit): Promise<Task> => {
+
+  return customFetch<Task>(getAddBlockUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      addBlockInput,)
+  }
+);}
+
+
+
+
+export const getAddBlockMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addBlock>>, TError,{data: BodyType<AddBlockInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addBlock>>, TError,{data: BodyType<AddBlockInput>}, TContext> => {
+
+const mutationKey = ['addBlock'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addBlock>>, {data: BodyType<AddBlockInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  addBlock(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddBlockMutationResult = NonNullable<Awaited<ReturnType<typeof addBlock>>>
+    export type AddBlockMutationBody = BodyType<AddBlockInput>
+    export type AddBlockMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Append an extra open block to a task group
+ */
+export const useAddBlock = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addBlock>>, TError,{data: BodyType<AddBlockInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addBlock>>,
+        TError,
+        {data: BodyType<AddBlockInput>},
+        TContext
+      > => {
+      return useMutation(getAddBlockMutationOptions(options));
     }
 
 export const getUpdateTaskUrl = (id: number,) => {

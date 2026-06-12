@@ -16,22 +16,7 @@ import { Plus, Trash2, Play, Check, AlignLeft, Link2, ExternalLink, X, Pencil } 
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { BudgetMeter } from "./BudgetMeter";
-
-// Normalize a user-typed URL (add https:// if no scheme is present).
-function normalizeUrl(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-}
-
-// Pull a clean hostname (no www.) for display in the link chip.
-function linkHost(url: string): string {
-  try {
-    return new URL(normalizeUrl(url)).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
+import { normalizeUrl, linkHost } from "@/lib/url";
 
 interface TimelineProps {
   onTaskSelect: (taskName: string) => void;

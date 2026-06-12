@@ -65,6 +65,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 - Orval generates `z.date()` (not a string) for `format: date` query params, so the generated `GetTimelineQueryParams` rejects the raw string Express puts in `req.query`. The timeline route validates `before` directly as a `YYYY-MM-DD` string instead of using the generated schema
 - Per-group "plays" are stored on the first block (chunkIndex 1) of a task group; increment via `PATCH /tasks/:id { incrementPlays: 1 }` which is atomic server-side (avoids lost updates from rapid taps) — do not read-modify-write `plays` from the client
 - Per-group `description` (note/plan) and `link` are also stored on the first block (chunkIndex 1), like `plays`; read via `group.blocks[0]` and write via `PATCH /tasks/:id { description, link }`. The PATCH route converts empty/whitespace strings to `null` (so an empty string clears the field). `link` is normalized client-side (https:// prepended if no scheme)
+- Any route that APPENDS a block to a group (computes `nextChunkIndex = max+1` then inserts: `complete-focus` append branch, `add-block`, the note-create path) must run inside a transaction holding `pg_advisory_xact_lock(hashtext(name))`. There is no DB unique constraint on `(name, date, chunkIndex)`, so without the shared lock a concurrent pair mints duplicate chunk indices. `FOR UPDATE SKIP LOCKED` only guards the claim/update path, NOT inserts
 
 ## Pointers
 

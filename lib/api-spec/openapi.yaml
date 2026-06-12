@@ -166,6 +166,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/TaskNote"
 
+  /tasks/group:
+    get:
+      operationId: getTaskGroup
+      tags: [tasks]
+      summary: Get a task group's context by name
+      description: >-
+        Returns the active block group for the given name — today's group if it
+        exists, otherwise the most recent group (any day). Includes the group's
+        blocks, the estimated vs. completed counts, and the note/link. Blocks are
+        empty when no group exists yet for the name.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: Task name to look up
+      responses:
+        "200":
+          description: The task group's context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskGroupContext"
+
+  /tasks/add-block:
+    post:
+      operationId: addBlock
+      tags: [tasks]
+      summary: Append an extra open block to a task group
+      description: >-
+        Adds one more open block to today's group for the given name without
+        changing the estimate, so completing it beyond the plan shows up as
+        overage. Returns the created block.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddBlockInput"
+      responses:
+        "200":
+          description: Block added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
   /tasks/{id}:
     patch:
       operationId: updateTask
@@ -330,6 +379,41 @@ components:
         description:
           type: string
           description: Note text (empty string clears the note)
+
+    TaskGroupContext:
+      type: object
+      required: [name, blocks, totalEstimated, completedCount]
+      properties:
+        name:
+          type: string
+        date:
+          type: ["string", "null"]
+          format: date
+          description: Calendar day of the resolved group (null when no group exists yet)
+        blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        totalEstimated:
+          type: integer
+          description: Originally planned block count for the group
+        completedCount:
+          type: integer
+          description: Number of completed blocks (may exceed totalEstimated when over)
+        description:
+          type: ["string", "null"]
+          description: The task-group note / plan
+        link:
+          type: ["string", "null"]
+          description: Reference URL attached to the task group
+
+    AddBlockInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
 
     TimelinePage:
       type: object

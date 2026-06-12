@@ -6,6 +6,8 @@ import {
   CompleteFocusBody,
   GetTaskNoteQueryParams,
   UpdateTaskNoteBody,
+  GetTaskGroupQueryParams,
+  AddBlockBody,
   UpdateTaskParams,
   UpdateTaskBody,
   DeleteTaskParams,
@@ -168,52 +170,60 @@ router.post("/tasks/complete-focus", async (req, res) => {
   const name = parsed.data.name;
   const today = getEasternDateString();
 
-  // Atomically claim the lowest open block for this name+day. FOR UPDATE SKIP
-  // LOCKED ensures two concurrent completions never claim the same row (which
-  // would otherwise lose a completion event under rapid taps).
-  const [claimed] = await db
-    .update(tasksTable)
-    .set({ completed: true, completedAt: new Date() })
-    .where(
-      eq(
-        tasksTable.id,
-        sql`(select ${tasksTable.id} from ${tasksTable} where ${tasksTable.date} = ${today} and ${tasksTable.name} = ${name} and ${tasksTable.completed} = false order by ${tasksTable.chunkIndex} asc limit 1 for update skip locked)`,
-      ),
-    )
-    .returning();
+  // Serialize with add-block (and other completions) for the same name via the
+  // shared advisory lock, so the claim-or-append decision and any appended
+  // chunkIndex are computed without a read-then-insert race that could mint a
+  // duplicate chunk index. add-block uses the same hashtext(name) lock domain.
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${name}))`);
 
-  if (claimed) {
-    res.json(serializeTask(claimed));
-    return;
-  }
+    // Claim the lowest open block for this name+day, if any. The advisory lock
+    // already serializes completions for this name, so a plain ordered claim is
+    // race-free (no SKIP LOCKED needed).
+    const [claimed] = await tx
+      .update(tasksTable)
+      .set({ completed: true, completedAt: new Date() })
+      .where(
+        eq(
+          tasksTable.id,
+          sql`(select ${tasksTable.id} from ${tasksTable} where ${tasksTable.date} = ${today} and ${tasksTable.name} = ${name} and ${tasksTable.completed} = false order by ${tasksTable.chunkIndex} asc limit 1)`,
+        ),
+      )
+      .returning();
 
-  // No open block — this was an unplanned focus run (or an extra block beyond
-  // the estimate). Append a completed block to the group for today.
-  const existing = await db
-    .select()
-    .from(tasksTable)
-    .where(and(eq(tasksTable.date, today), eq(tasksTable.name, name)));
+    if (claimed) {
+      return claimed;
+    }
 
-  const nextChunkIndex =
-    existing.reduce((max, t) => Math.max(max, t.chunkIndex), 0) + 1;
-  const totalChunks = existing.reduce(
-    (max, t) => Math.max(max, t.totalChunks),
-    nextChunkIndex,
-  );
+    // No open block — this was an unplanned focus run (or an extra block beyond
+    // the estimate). Append a completed block to the group for today.
+    const existing = await tx
+      .select()
+      .from(tasksTable)
+      .where(and(eq(tasksTable.date, today), eq(tasksTable.name, name)));
 
-  const [created] = await db
-    .insert(tasksTable)
-    .values({
-      name,
-      date: today,
-      chunkIndex: nextChunkIndex,
-      totalChunks,
-      completed: true,
-      completedAt: new Date(),
-    })
-    .returning();
+    const nextChunkIndex =
+      existing.reduce((max, t) => Math.max(max, t.chunkIndex), 0) + 1;
+    const totalChunks = existing.reduce(
+      (max, t) => Math.max(max, t.totalChunks),
+      nextChunkIndex,
+    );
 
-  res.json(serializeTask(created));
+    const [created] = await tx
+      .insert(tasksTable)
+      .values({
+        name,
+        date: today,
+        chunkIndex: nextChunkIndex,
+        totalChunks,
+        completed: true,
+        completedAt: new Date(),
+      })
+      .returning();
+    return created;
+  });
+
+  res.json(serializeTask(result));
 });
 
 // GET /tasks/note?name=... — task-group note (description) by name, resolved
@@ -295,6 +305,114 @@ router.put("/tasks/note", async (req, res) => {
   });
 
   res.json(result);
+});
+
+// GET /tasks/group?name=... — the active block group for a name, used by the
+// focus timer to show full task context (blocks, estimate vs. actual, note,
+// link). Resolves today's group if it exists, otherwise the most recent group
+// (any day) so a carried-over task still surfaces. Registered before /tasks/:id.
+router.get("/tasks/group", async (req, res) => {
+  const parsed = GetTaskGroupQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid query" });
+    return;
+  }
+
+  const name = parsed.data.name;
+  const today = getEasternDateString();
+
+  // Prefer today's group so add-block / complete-focus (which target today) stay
+  // in sync with what the timer shows.
+  let blocks = await db
+    .select()
+    .from(tasksTable)
+    .where(and(eq(tasksTable.date, today), eq(tasksTable.name, name)))
+    .orderBy(asc(tasksTable.chunkIndex));
+  let date: string | null = today;
+
+  if (blocks.length === 0) {
+    // No blocks today — fall back to the most recent day this task ran on.
+    const [recent] = await db
+      .select({ date: tasksTable.date })
+      .from(tasksTable)
+      .where(eq(tasksTable.name, name))
+      .orderBy(desc(tasksTable.date))
+      .limit(1);
+
+    if (recent) {
+      date = recent.date;
+      blocks = await db
+        .select()
+        .from(tasksTable)
+        .where(and(eq(tasksTable.date, recent.date), eq(tasksTable.name, name)))
+        .orderBy(asc(tasksTable.chunkIndex));
+    } else {
+      date = null;
+    }
+  }
+
+  const first = blocks[0];
+  const totalEstimated = first ? first.totalChunks : 0;
+  const completedCount = blocks.filter((b) => b.completed).length;
+
+  res.json({
+    name,
+    date,
+    blocks: blocks.map(serializeTask),
+    totalEstimated,
+    completedCount,
+    description: first?.description ?? null,
+    link: first?.link ?? null,
+  });
+});
+
+// POST /tasks/add-block — append one extra OPEN block to today's group for a
+// name WITHOUT raising the estimate, so completing it beyond the plan shows as
+// overage. Unlike complete-focus, totalChunks stays at the current estimate
+// (not bumped to nextChunkIndex), keeping the group's first-block estimate
+// fixed. Registered before /tasks/:id.
+router.post("/tasks/add-block", async (req, res) => {
+  const parsed = AddBlockBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+
+  const name = parsed.data.name;
+  const today = getEasternDateString();
+
+  // Serialize concurrent add-block/complete-focus for the same name so the
+  // next chunkIndex is computed without a read-then-insert race.
+  const created = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${name}))`);
+
+    const existing = await tx
+      .select()
+      .from(tasksTable)
+      .where(and(eq(tasksTable.date, today), eq(tasksTable.name, name)));
+
+    const nextChunkIndex =
+      existing.reduce((max, t) => Math.max(max, t.chunkIndex), 0) + 1;
+    // Keep the estimate fixed at the group's current plan (never below 1).
+    const totalChunks = existing.reduce(
+      (max, t) => Math.max(max, t.totalChunks),
+      1,
+    );
+
+    const [row] = await tx
+      .insert(tasksTable)
+      .values({
+        name,
+        date: today,
+        chunkIndex: nextChunkIndex,
+        totalChunks,
+        completed: false,
+      })
+      .returning();
+    return row;
+  });
+
+  res.json(serializeTask(created));
 });
 
 // PATCH /tasks/:id

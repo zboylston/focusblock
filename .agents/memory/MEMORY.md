@@ -1,4 +1,1 @@
-- [Orval format:date coercion](orval-date-coercion.md) — OpenAPI format:date body fields arrive as `Date` in server Zod validation but `string` in client types; normalize in routes.
-- [Countdown timer restart pattern](timer-restart-pattern.md) — to restart a running React setInterval countdown, set endTimeRef to a fresh valid timestamp synchronously + bump a runId in the effect deps; never leave the ref null.
-- [Client aggregates must be server-side](client-aggregates-must-be-server-side.md) — totals spanning ALL records can't be summed from infinite-query pages (paginated by day); compute them in a SQL aggregate endpoint instead.
-- [Notes resolved by name use most-recent group](note-by-name-resolution.md) — by-name note lookups span all days (most-recent group), upsert needs an advisory-lock txn, and orval option overrides require an explicit queryKey.
+- [Task block write locking](task-block-write-locking.md) — all routes that append a block to a task group must share `pg_advisory_xact_lock(hashtext(name))`; SKIP LOCKED protects updates, not inserts.

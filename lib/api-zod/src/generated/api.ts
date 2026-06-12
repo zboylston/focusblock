@@ -143,6 +143,70 @@ export const UpdateTaskNoteResponse = zod.object({
 
 
 /**
+ * Returns the active block group for the given name — today's group if it exists, otherwise the most recent group (any day). Includes the group's blocks, the estimated vs. completed counts, and the note/link. Blocks are empty when no group exists yet for the name.
+ * @summary Get a task group's context by name
+ */
+
+
+
+export const GetTaskGroupQueryParams = zod.object({
+  "name": zod.coerce.string().min(1).describe('Task name to look up')
+})
+
+export const GetTaskGroupResponse = zod.object({
+  "name": zod.string(),
+  "date": zod.coerce.date().nullish().describe('Calendar day of the resolved group (null when no group exists yet)'),
+  "blocks": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "date": zod.coerce.date(),
+  "chunkIndex": zod.number().describe('1-based index within its block group'),
+  "totalChunks": zod.number(),
+  "completed": zod.boolean(),
+  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
+  "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
+  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this block'),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "totalEstimated": zod.number().describe('Originally planned block count for the group'),
+  "completedCount": zod.number().describe('Number of completed blocks (may exceed totalEstimated when over)'),
+  "description": zod.string().nullish().describe('The task-group note \/ plan'),
+  "link": zod.string().nullish().describe('Reference URL attached to the task group')
+})
+
+
+/**
+ * Adds one more open block to today's group for the given name without changing the estimate, so completing it beyond the plan shows up as overage. Returns the created block.
+ * @summary Append an extra open block to a task group
+ */
+
+
+
+export const AddBlockBody = zod.object({
+  "name": zod.string().min(1)
+})
+
+export const AddBlockResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "date": zod.coerce.date(),
+  "chunkIndex": zod.number().describe('1-based index within its block group'),
+  "totalChunks": zod.number(),
+  "completed": zod.boolean(),
+  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
+  "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
+  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this block'),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * Mark a task done, rename it, attach a rating/notes, or adjust plays
  * @summary Update a task
  */
