@@ -1,14 +1,11 @@
 let ctx: AudioContext | null = null;
 let alarmInterval: ReturnType<typeof setInterval> | null = null;
 let alarmTimeout: ReturnType<typeof setTimeout> | null = null;
-// Bumped on every start/stop so a deferred resume() can't ring after a stop.
 let alarmGen = 0;
 
-// Keep ringing until acknowledged, but never longer than a minute so a missed
-// alert doesn't beep forever.
 const ALARM_DURATION_MS = 60_000;
-// Gap between repeats. The beep cluster is ~0.8s, so this leaves a short pause.
-const ALARM_INTERVAL_MS = 1200;
+// Longer gap so three gentle bells have room to breathe before repeating.
+const ALARM_INTERVAL_MS = 6_000;
 
 function getCtx(): AudioContext {
   if (!ctx) {
@@ -24,46 +21,59 @@ export const primeAudio = () => {
   } catch (_) {}
 };
 
-const beep = (c: AudioContext, startTime: number, freq: number, duration: number) => {
-  const osc = c.createOscillator();
-  const gain = c.createGain();
+// A single meditative bell strike.
+// Models two sine partials: the fundamental and a higher inharmonic overtone
+// (ratio ≈ 2.76×, typical of metal bowls). Both decay exponentially — the
+// overtone fades faster so the fundamental rings on, mimicking a real bell.
+const bell = (
+  c: AudioContext,
+  startTime: number,
+  freq: number,
+  peakGain: number,
+  decaySec: number,
+) => {
+  const strike = (partialFreq: number, partialGain: number, dur: number) => {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(partialFreq, startTime);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(partialGain, startTime + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+    osc.connect(gain);
+    gain.connect(c.destination);
+    osc.start(startTime);
+    osc.stop(startTime + dur);
+  };
 
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(freq, startTime);
-
-  gain.gain.setValueAtTime(0, startTime);
-  gain.gain.linearRampToValueAtTime(0.6, startTime + 0.02);
-  gain.gain.setValueAtTime(0.6, startTime + duration - 0.05);
-  gain.gain.linearRampToValueAtTime(0, startTime + duration);
-
-  osc.connect(gain);
-  gain.connect(c.destination);
-
-  osc.start(startTime);
-  osc.stop(startTime + duration);
+  strike(freq, peakGain, decaySec);
+  strike(freq * 2.76, peakGain * 0.45, decaySec * 0.55);
 };
 
+// Three ascending bell strikes — C5 → E5 → G5 (major triad, soft and open).
+// Each is slightly quieter than the last so it reads as a gentle fade-in chime.
 const ringOnce = () => {
   try {
     const c = getCtx();
+    const go = () => {
+      const t = c.currentTime;
+      bell(c, t + 0.0,  523.25, 0.28, 3.0);  // C5
+      bell(c, t + 1.2,  659.25, 0.22, 3.2);  // E5
+      bell(c, t + 2.4,  783.99, 0.18, 3.6);  // G5
+    };
     if (c.state === "suspended") {
       const gen = alarmGen;
       c.resume()
-        .then(() => {
-          // Skip if the alarm was stopped while resume() was pending.
-          if (gen === alarmGen) scheduleBeeps(c);
-        })
+        .then(() => { if (gen === alarmGen) go(); })
         .catch(() => {});
     } else {
-      scheduleBeeps(c);
+      go();
     }
   } catch (err) {
     console.error("Audio playback failed", err);
   }
 };
 
-// Start the end-of-session alarm: ring immediately, then repeat until either
-// stopAlertTone() is called (user acknowledges) or a minute has elapsed.
 export const playAlertTone = () => {
   stopAlertTone();
   ringOnce();
@@ -71,7 +81,6 @@ export const playAlertTone = () => {
   alarmTimeout = setTimeout(stopAlertTone, ALARM_DURATION_MS);
 };
 
-// Silence a ringing alarm. Safe to call any time (idempotent).
 export const stopAlertTone = () => {
   alarmGen++;
   if (alarmInterval !== null) {
@@ -82,11 +91,4 @@ export const stopAlertTone = () => {
     clearTimeout(alarmTimeout);
     alarmTimeout = null;
   }
-};
-
-const scheduleBeeps = (c: AudioContext) => {
-  const t = c.currentTime;
-  beep(c, t,        880, 0.18);
-  beep(c, t + 0.25, 880, 0.18);
-  beep(c, t + 0.50, 1100, 0.30);
 };

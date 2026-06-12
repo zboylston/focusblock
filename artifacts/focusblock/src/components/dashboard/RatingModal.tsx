@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useUpdateTask, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Coffee } from "lucide-react";
+import { stopAlertTone } from "@/lib/audio";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,7 @@ export function RatingModal({ taskId, onComplete, onAddBlock }: RatingModalProps
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onComplete()}>
-      <DialogContent className="sm:max-w-md text-center p-8">
+      <DialogContent className="sm:max-w-md text-center p-8" onPointerDown={stopAlertTone}>
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold mb-2">Block complete</DialogTitle>
           <DialogDescription className="text-base">
