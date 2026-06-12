@@ -484,10 +484,10 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
 
   return (
     <div className={`group rounded-lg px-3 py-3 transition-colors hover:bg-muted/30 ${allDone ? "opacity-70" : ""}`}>
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         {/* Block dots — only when there's something still to do */}
         {hasPending && (
-          <div className="flex flex-wrap gap-1.5 flex-shrink-0" style={{ maxWidth: "7rem" }}>
+          <div className="flex flex-wrap gap-1.5 flex-shrink-0 mt-1" style={{ maxWidth: "7rem" }}>
             {group.blocks.map((block) => (
               <button
                 key={block.id}
@@ -504,7 +504,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
         )}
 
         {allDone && (
-          <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+          <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
             <Check className="w-3 h-3 text-primary" />
           </div>
         )}
@@ -528,82 +528,86 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               className="h-7 px-2 py-0 text-sm font-medium"
             />
           ) : (
-            <div className="flex items-start gap-1.5">
-              <span
-                className={`font-medium break-words ${hasPending ? "cursor-pointer" : ""} ${allDone ? "text-muted-foreground" : "text-foreground"}`}
-                onClick={() => hasPending && onSelect(group.name)}
-              >
-                {group.name}
+            <span
+              className={`font-medium break-words ${hasPending ? "cursor-pointer" : ""} ${allDone ? "text-muted-foreground" : "text-foreground"}`}
+              onClick={() => hasPending && onSelect(group.name)}
+            >
+              {group.name}
+            </span>
+          )}
+
+          {/* Meta line: counts on the left, hover actions on the right —
+              keeping the actions here means they never steal title width */}
+          <div className="mt-0.5 flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground font-mono flex items-center gap-2">
+              <span>
+                {group.completedCount} / {group.totalEstimated} blocks
+                {overEstimate && (
+                  <span className="ml-1 text-amber-500">+{group.completedCount - group.totalEstimated} over</span>
+                )}
               </span>
+              {group.plays > 0 && (
+                <span className="flex items-center gap-0.5 text-primary/80">
+                  <Play className="w-3 h-3 fill-current" />
+                  {group.plays}
+                </span>
+              )}
+            </span>
+
+            <div
+              className={`flex items-center gap-0.5 flex-shrink-0 transition-opacity ${
+                expanded ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+              }`}
+            >
               <button
                 type="button"
                 title="Rename task"
                 onClick={beginEditTitle}
-                className="flex-shrink-0 text-muted-foreground/60 hover:text-primary opacity-0 group-hover:opacity-100 transition-all"
+                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
               >
-                <Pencil className="w-3 h-3" />
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                title={hasMeta ? "Show note & link" : "Add a note or link"}
+                onClick={() => setExpanded((v) => !v)}
+                className={`w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-primary/10 transition-colors ${
+                  expanded ? "text-primary" : "text-muted-foreground hover:text-primary"
+                }`}
+              >
+                {hasMeta ? <AlignLeft className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              </button>
+              {hasPending && (
+                <>
+                  <button
+                    type="button"
+                    title="Mark all done"
+                    onClick={() => onCompleteAll(group)}
+                    className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Start a 30-min focus block for this task"
+                    onClick={() => onPlay(group)}
+                    className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                title="Delete task"
+                onClick={() => onDelete(group.blocks)}
+                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
-          )}
-          <span className="text-xs text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
-            <span>
-              {group.completedCount} / {group.totalEstimated} blocks
-              {overEstimate && (
-                <span className="ml-1 text-amber-500">+{group.completedCount - group.totalEstimated} over</span>
-              )}
-            </span>
-            {group.plays > 0 && (
-              <span className="flex items-center gap-0.5 text-primary/80">
-                <Play className="w-3 h-3 fill-current" />
-                {group.plays}
-              </span>
-            )}
-          </span>
+          </div>
         </div>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          title={hasMeta ? "Show note & link" : "Add a note or link"}
-          className={`flex-shrink-0 transition-all hover:text-primary hover:bg-primary/10 text-muted-foreground ${
-            expanded ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100"
-          }`}
-          onClick={() => setExpanded((v) => !v)}
-        >
-          {hasMeta ? <AlignLeft className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-        </Button>
-
-        {hasPending && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Mark all done"
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary hover:bg-primary/10"
-              onClick={() => onCompleteAll(group)}
-            >
-              <Check className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Start a 30-min focus block for this task"
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary hover:bg-primary/10"
-              onClick={() => onPlay(group)}
-            >
-              <Play className="w-4 h-4 fill-current" />
-            </Button>
-          </>
-        )}
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0 -mr-1"
-          onClick={() => onDelete(group.blocks)}
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
       </div>
 
       {/* Faint note preview (collapsed) — click to expand for full context */}
