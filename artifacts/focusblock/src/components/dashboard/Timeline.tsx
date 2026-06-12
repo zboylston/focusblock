@@ -451,7 +451,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
                 key={block.id}
                 title={block.completed ? `Block ${block.chunkIndex} — done` : `Block ${block.chunkIndex} — mark done`}
                 onClick={() => onToggleBlock(block)}
-                className={`w-4 h-4 rounded-full border-2 transition-all hover:scale-110 focus:outline-none ${
+                className={`w-4 h-4 rounded-sm border-2 transition-all hover:scale-110 focus:outline-none ${
                   block.completed
                     ? "bg-primary border-primary"
                     : "bg-transparent border-muted-foreground/40 hover:border-primary/60"
