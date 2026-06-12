@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, RotateCcw, Plus, ExternalLink, CornerDownRight } from "lucide-react";
+import { Play, Pause, RotateCcw, Plus, ExternalLink, CornerDownRight, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { MarkdownEditor } from "./MarkdownEditor";
 import { playAlertTone, stopAlertTone, primeAudio } from "@/lib/audio";
 import { requestNotificationPermission, showNotification } from "@/lib/notifications";
 import { linkHost, normalizeUrl } from "@/lib/url";
@@ -31,9 +32,18 @@ interface TimerProps {
   activeTaskName: string;
   onTaskNameChange: (name: string) => void;
   startToken: number;
+  /** Whether the timer card is widened into scratchpad mode. */
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
 }
 
-export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerProps) {
+export function Timer({
+  activeTaskName,
+  onTaskNameChange,
+  startToken,
+  expanded,
+  onExpandedChange,
+}: TimerProps) {
   const [mode, setMode] = useState<TimerMode>("focus");
   const [timeLeft, setTimeLeft] = useState(FOCUS_SECONDS);
   const [isActive, setIsActive] = useState(false);
@@ -65,19 +75,6 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
   // True while the textarea is focused, so a background refetch (e.g. on window
   // focus or post-save invalidation) can't overwrite in-progress edits.
   const isEditingNoteRef = useRef(false);
-  const noteRef = useRef<HTMLTextAreaElement>(null);
-
-  const autoResizeNote = useCallback(() => {
-    const el = noteRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, []);
-
-  // Re-measure whenever the note content changes (typing or server load).
-  useEffect(() => {
-    autoResizeNote();
-  }, [noteDraft, autoResizeNote]);
 
   // Current sub-focus ("what I'm on right now") within the active task group.
   // Stored on the group's first block (chunkIndex 1), like description/link.
@@ -222,6 +219,16 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     }
   }, [activeTaskName, noteDraft, updateTaskNote, queryClient, toast]);
 
+  // Debounced autosave so a long scratchpad session isn't lost if you never
+  // blur. Only runs while actively editing; saveNote no-ops if nothing changed.
+  useEffect(() => {
+    if (!isEditingNoteRef.current) return;
+    const t = setTimeout(() => {
+      void saveNote();
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [noteDraft, saveNote]);
+
   // Persist the sub-focus onto the group's first block via PATCH. Empty string
   // clears it server-side (trimmed to null), like description/link.
   const saveSubtask = useCallback(async () => {
@@ -354,7 +361,8 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     requestNotificationPermission();
     setIsActive(true);
     setRunId((n) => n + 1);
-  }, [startToken, stopTitleFlash]);
+    onExpandedChange(true);
+  }, [startToken, stopTitleFlash, onExpandedChange]);
 
   const toggleTimer = () => {
     stopAlertTone();
@@ -369,6 +377,8 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
       // Ask for notification permission so we can alert even if the tab is
       // backgrounded when the timer finishes.
       requestNotificationPermission();
+      // Starting a focus session opens the scratchpad.
+      if (mode === "focus") onExpandedChange(true);
     }
     setIsActive((prev) => !prev);
   };
@@ -378,6 +388,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     setIsActive(false);
     endTimeRef.current = null;
     setTimeLeft(mode === "focus" ? FOCUS_SECONDS : BREAK_SECONDS);
+    onExpandedChange(false);
   };
 
   const switchMode = (next: TimerMode) => {
@@ -386,6 +397,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     endTimeRef.current = null;
     setMode(next);
     setTimeLeft(next === "focus" ? FOCUS_SECONDS : BREAK_SECONDS);
+    if (next === "break") onExpandedChange(false);
   };
 
   const handleRatingComplete = () => {
@@ -397,6 +409,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     setMode("break");
     setTimeLeft(BREAK_SECONDS);
     endTimeRef.current = null;
+    onExpandedChange(false);
   };
 
   // "Add another block" from the completion card: append an extra block and stay
@@ -411,6 +424,7 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
     setTimeLeft(FOCUS_SECONDS);
     setIsActive(false);
     endTimeRef.current = null;
+    onExpandedChange(true);
   };
 
   const minutes = Math.floor(timeLeft / 60);
@@ -579,19 +593,33 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
           )}
 
           {mode === "focus" && trimmedName && (
-            <div className="w-full max-w-xs mt-6 pt-6 border-t border-border/40">
-              <label
-                htmlFor="focus-note"
-                className="block text-[0.7rem] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 mb-2"
-              >
-                Notes
-              </label>
-              <Textarea
-                id="focus-note"
-                ref={noteRef}
+            <div
+              className={cn(
+                "w-full mt-6 pt-6 border-t border-border/40 transition-[max-width] duration-500 ease-out",
+                expanded ? "max-w-2xl" : "max-w-xs",
+              )}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="block text-[0.7rem] font-medium uppercase tracking-[0.14em] text-muted-foreground/70">
+                  Notes
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onExpandedChange(!expanded)}
+                  title={expanded ? "Collapse scratchpad" : "Expand scratchpad"}
+                  aria-label={expanded ? "Collapse scratchpad" : "Expand scratchpad"}
+                  className="text-muted-foreground/50 hover:text-foreground transition-colors focus:outline-none"
+                >
+                  {expanded ? (
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              </div>
+              <MarkdownEditor
                 value={noteDraft}
-                onChange={(e) => setNoteDraft(e.target.value)}
-                onInput={autoResizeNote}
+                onChange={setNoteDraft}
                 onFocus={() => {
                   isEditingNoteRef.current = true;
                 }}
@@ -600,7 +628,12 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
                   void saveNote();
                 }}
                 placeholder="Jot what you're working on…"
-                className="resize-none border-border/50 bg-transparent text-sm leading-relaxed placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary min-h-[3.5rem] overflow-hidden"
+                className={cn(
+                  "rounded-md border border-border/50 bg-transparent px-3 py-2 text-sm leading-relaxed text-left transition-[min-height,max-height] duration-500 ease-out overflow-y-auto focus-within:border-primary",
+                  expanded
+                    ? "min-h-[18rem] max-h-[60vh]"
+                    : "min-h-[3.5rem] max-h-[14rem]",
+                )}
               />
             </div>
           )}

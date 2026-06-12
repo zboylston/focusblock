@@ -1,1 +1,2 @@
 - [Task block write locking](task-block-write-locking.md) — all routes that append a block to a task group must share `pg_advisory_xact_lock(hashtext(name))`; SKIP LOCKED protects updates, not inserts.
+- [TipTap controlled sync](tiptap-controlled-sync.md) — controlled rich-text editor + server refetch needs a two-layer guard (parent editing-ref + editor.isFocused) to avoid clobbering typing.

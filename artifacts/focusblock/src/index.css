@@ -125,3 +125,48 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* --- Markdown scratchpad (TipTap) --- */
+.md-scratchpad .ProseMirror {
+  min-height: inherit;
+}
+.md-scratchpad .ProseMirror > * + * {
+  margin-top: 0.5em;
+}
+/* Empty-state placeholder (Placeholder extension marks the first empty node). */
+.md-scratchpad .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: hsl(var(--muted-foreground) / 0.5);
+}
+/* Task list: flat checkbox rows, no bullet markers. */
+.md-scratchpad .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+.md-scratchpad .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+.md-scratchpad .ProseMirror ul[data-type="taskList"] li > label {
+  margin-top: 0.2em;
+  flex-shrink: 0;
+  user-select: none;
+}
+.md-scratchpad .ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.md-scratchpad .ProseMirror ul[data-type="taskList"] li > div > p {
+  margin: 0;
+}
+.md-scratchpad .ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  accent-color: hsl(var(--primary));
+  width: 0.95em;
+  height: 0.95em;
+  cursor: pointer;
+}
