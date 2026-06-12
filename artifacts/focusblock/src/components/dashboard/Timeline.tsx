@@ -12,7 +12,7 @@ import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Play, Check, ChevronDown, AlignLeft, Link2, ExternalLink, X, Pencil } from "lucide-react";
+import { Plus, Trash2, Play, Check, AlignLeft, Link2, ExternalLink, X, Pencil } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -490,9 +490,9 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
           variant="ghost"
           size="icon"
           title={hasMeta ? "Show note & link" : "Add a note or link"}
-          className={`flex-shrink-0 hover:text-primary hover:bg-primary/10 transition-all ${
-            hasMeta ? "text-primary/70" : "text-muted-foreground/50"
-          } ${expanded ? "text-primary" : ""}`}
+          className={`flex-shrink-0 transition-all hover:text-primary hover:bg-primary/10 text-muted-foreground ${
+            expanded ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100"
+          }`}
           onClick={() => setExpanded((v) => !v)}
         >
           {hasMeta ? <AlignLeft className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -504,7 +504,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               variant="ghost"
               size="icon"
               title="Mark all done"
-              className="flex-shrink-0 text-muted-foreground/40 hover:text-primary hover:bg-primary/10"
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary hover:bg-primary/10"
               onClick={() => onCompleteAll(group)}
             >
               <Check className="w-4 h-4" />
@@ -513,7 +513,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               variant="ghost"
               size="icon"
               title="Start a 30-min focus block for this task"
-              className="flex-shrink-0 text-primary hover:text-primary hover:bg-primary/10"
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary hover:bg-primary/10"
               onClick={() => onPlay(group)}
             >
               <Play className="w-4 h-4 fill-current" />
@@ -548,7 +548,6 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               {linkHost(group.link!)}
             </span>
           )}
-          <ChevronDown className="w-3 h-3 flex-shrink-0 opacity-60" />
         </button>
       )}
 
