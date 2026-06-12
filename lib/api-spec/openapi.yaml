@@ -120,6 +120,52 @@ paths:
               schema:
                 $ref: "#/components/schemas/Task"
 
+  /tasks/note:
+    get:
+      operationId: getTaskNote
+      tags: [tasks]
+      summary: Get a task's note by name
+      description: >-
+        Returns the task-group note (description) for the most recent group with
+        the given name (any day), or null if no such group exists yet.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: Task name to look up
+      responses:
+        "200":
+          description: The task's note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskNote"
+    put:
+      operationId: updateTaskNote
+      tags: [tasks]
+      summary: Set a task's note by name
+      description: >-
+        Upserts the task-group note for the most recent group with the given
+        name (any day). Updates that group's first block if it exists; otherwise
+        creates a single open block today to hold the note (skipped when the note
+        is empty). An empty note clears an existing one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskNoteInput"
+      responses:
+        "200":
+          description: The updated note
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskNote"
+
   /tasks/{id}:
     patch:
       operationId: updateTask
@@ -262,6 +308,28 @@ components:
         name:
           type: string
           minLength: 1
+
+    TaskNote:
+      type: object
+      required: [taskId, description]
+      properties:
+        taskId:
+          type: ["integer", "null"]
+          description: Id of the block holding the note (null when no group exists yet)
+        description:
+          type: ["string", "null"]
+          description: The task-group note text (null when empty)
+
+    TaskNoteInput:
+      type: object
+      required: [name, description]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          description: Note text (empty string clears the note)
 
     TimelinePage:
       type: object

@@ -108,6 +108,41 @@ export const CompleteFocusResponse = zod.object({
 
 
 /**
+ * Returns the task-group note (description) for the most recent group with the given name (any day), or null if no such group exists yet.
+ * @summary Get a task's note by name
+ */
+
+
+
+export const GetTaskNoteQueryParams = zod.object({
+  "name": zod.coerce.string().min(1).describe('Task name to look up')
+})
+
+export const GetTaskNoteResponse = zod.object({
+  "taskId": zod.number().nullable().describe('Id of the block holding the note (null when no group exists yet)'),
+  "description": zod.string().nullable().describe('The task-group note text (null when empty)')
+})
+
+
+/**
+ * Upserts the task-group note for the most recent group with the given name (any day). Updates that group's first block if it exists; otherwise creates a single open block today to hold the note (skipped when the note is empty). An empty note clears an existing one.
+ * @summary Set a task's note by name
+ */
+
+
+
+export const UpdateTaskNoteBody = zod.object({
+  "name": zod.string().min(1),
+  "description": zod.string().describe('Note text (empty string clears the note)')
+})
+
+export const UpdateTaskNoteResponse = zod.object({
+  "taskId": zod.number().nullable().describe('Id of the block holding the note (null when no group exists yet)'),
+  "description": zod.string().nullable().describe('The task-group note text (null when empty)')
+})
+
+
+/**
  * Mark a task done, rename it, attach a rating/notes, or adjust plays
  * @summary Update a task
  */

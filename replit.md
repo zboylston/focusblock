@@ -26,7 +26,7 @@ A full-stack time-blocking and focus timer app for deep work. Track 30-minute fo
 
 - `lib/api-spec/openapi.yaml` — single source of truth for all API contracts
 - `lib/db/src/schema/tasks.ts` — unified focus-block table (planner + log; has `rating` + `notes`)
-- `artifacts/api-server/src/routes/tasks.ts` — task CRUD + timeline + stats + complete-focus routes
+- `artifacts/api-server/src/routes/tasks.ts` — task CRUD + timeline + stats + complete-focus + note-by-name routes
 - `artifacts/focusblock/src/components/dashboard/Timeline.tsx` — unified infinite-scroll timeline
 - `artifacts/focusblock/src/` — React frontend
 
@@ -50,6 +50,7 @@ A full-stack time-blocking and focus timer app for deep work. Track 30-minute fo
 - Inline today summary (blocks today / minutes focused)
 - Live "X chunks until 5 PM EST" counter in the header
 - Day-budget meter: compares total remaining planned blocks (summed across ALL open task groups, not just today's — carried-over open tasks still count) against work blocks left until 5 PM. Shows "N to spare" (primary/green) or "N over" (destructive/red) with a comparison bar (planned fill + hairline capacity marker). Capacity comes from the shared `useChunksLeft` hook
+- Focus-card notes: while in focus mode with an active task name, a "Notes" textarea on the timer card shows and edits that task's note (the same per-group `description` shown in the timeline). Looked up/saved by name via `GET/PUT /tasks/note`, which resolve the MOST RECENT group for that name (any day) so a carried-over task still surfaces and edits its existing note; only when no group exists at all does saving materialize a single open block (today) to hold it. Saves on blur
 - Per-task note/plan + reference link: add/edit a note and attach a link after creation. Collapsed, they show as a faint one-line preview under the task (click to expand); expanded reveals an inline note textarea (save on blur) and a modern link chip (favicon + hostname, edit/remove) or a paste-a-link input
 
 ## User preferences

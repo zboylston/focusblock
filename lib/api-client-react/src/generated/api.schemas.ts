@@ -89,6 +89,26 @@ export interface CompleteFocusInput {
   name: string;
 }
 
+export interface TaskNote {
+  /**
+     * Id of the block holding the note (null when no group exists yet)
+     * @nullable
+     */
+  taskId: number | null;
+  /**
+     * The task-group note text (null when empty)
+     * @nullable
+     */
+  description: string | null;
+}
+
+export interface TaskNoteInput {
+  /** @minLength 1 */
+  name: string;
+  /** Note text (empty string clears the note) */
+  description: string;
+}
+
 export interface TimelinePage {
   tasks: Task[];
   /**
@@ -117,5 +137,13 @@ before?: string;
  * @maximum 31
  */
 limit?: number;
+};
+
+export type GetTaskNoteParams = {
+/**
+ * Task name to look up
+ * @minLength 1
+ */
+name: string;
 };
 

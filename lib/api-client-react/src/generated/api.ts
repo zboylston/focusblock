@@ -21,10 +21,13 @@ import type {
 
 import type {
   CompleteFocusInput,
+  GetTaskNoteParams,
   GetTimelineParams,
   HealthStatus,
   Task,
   TaskInput,
+  TaskNote,
+  TaskNoteInput,
   TaskUpdate,
   TimelinePage,
   TodayStats
@@ -425,6 +428,163 @@ export const useCompleteFocus = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCompleteFocusMutationOptions(options));
+    }
+
+export const getGetTaskNoteUrl = (params: GetTaskNoteParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/tasks/note?${stringifiedParams}` : `/api/tasks/note`
+}
+
+/**
+ * Returns the task-group note (description) for the most recent group with the given name (any day), or null if no such group exists yet.
+ * @summary Get a task's note by name
+ */
+export const getTaskNote = async (params: GetTaskNoteParams, options?: RequestInit): Promise<TaskNote> => {
+
+  return customFetch<TaskNote>(getGetTaskNoteUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTaskNoteQueryKey = (params?: GetTaskNoteParams,) => {
+    return [
+    `/api/tasks/note`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTaskNoteQueryOptions = <TData = Awaited<ReturnType<typeof getTaskNote>>, TError = ErrorType<unknown>>(params: GetTaskNoteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTaskNote>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTaskNoteQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTaskNote>>> = ({ signal }) => getTaskNote(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTaskNote>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTaskNoteQueryResult = NonNullable<Awaited<ReturnType<typeof getTaskNote>>>
+export type GetTaskNoteQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a task's note by name
+ */
+
+export function useGetTaskNote<TData = Awaited<ReturnType<typeof getTaskNote>>, TError = ErrorType<unknown>>(
+ params: GetTaskNoteParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTaskNote>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTaskNoteQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateTaskNoteUrl = () => {
+
+
+
+
+  return `/api/tasks/note`
+}
+
+/**
+ * Upserts the task-group note for the most recent group with the given name (any day). Updates that group's first block if it exists; otherwise creates a single open block today to hold the note (skipped when the note is empty). An empty note clears an existing one.
+ * @summary Set a task's note by name
+ */
+export const updateTaskNote = async (taskNoteInput: TaskNoteInput, options?: RequestInit): Promise<TaskNote> => {
+
+  return customFetch<TaskNote>(getUpdateTaskNoteUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      taskNoteInput,)
+  }
+);}
+
+
+
+
+export const getUpdateTaskNoteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTaskNote>>, TError,{data: BodyType<TaskNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTaskNote>>, TError,{data: BodyType<TaskNoteInput>}, TContext> => {
+
+const mutationKey = ['updateTaskNote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTaskNote>>, {data: BodyType<TaskNoteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateTaskNote(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTaskNoteMutationResult = NonNullable<Awaited<ReturnType<typeof updateTaskNote>>>
+    export type UpdateTaskNoteMutationBody = BodyType<TaskNoteInput>
+    export type UpdateTaskNoteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Set a task's note by name
+ */
+export const useUpdateTaskNote = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTaskNote>>, TError,{data: BodyType<TaskNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTaskNote>>,
+        TError,
+        {data: BodyType<TaskNoteInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateTaskNoteMutationOptions(options));
     }
 
 export const getUpdateTaskUrl = (id: number,) => {

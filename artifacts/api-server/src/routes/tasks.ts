@@ -4,6 +4,8 @@ import { eq, and, asc, desc, lt, inArray, sql } from "drizzle-orm";
 import {
   CreateTasksBody,
   CompleteFocusBody,
+  GetTaskNoteQueryParams,
+  UpdateTaskNoteBody,
   UpdateTaskParams,
   UpdateTaskBody,
   DeleteTaskParams,
@@ -212,6 +214,87 @@ router.post("/tasks/complete-focus", async (req, res) => {
     .returning();
 
   res.json(serializeTask(created));
+});
+
+// GET /tasks/note?name=... — task-group note (description) by name, resolved
+// from the MOST RECENT group (any day) so a carried-over task still surfaces its
+// existing note. Registered before /tasks/:id so the literal segment wins.
+router.get("/tasks/note", async (req, res) => {
+  const parsed = GetTaskNoteQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid query" });
+    return;
+  }
+
+  const [first] = await db
+    .select()
+    .from(tasksTable)
+    .where(eq(tasksTable.name, parsed.data.name))
+    .orderBy(desc(tasksTable.date), asc(tasksTable.chunkIndex))
+    .limit(1);
+
+  res.json({ taskId: first?.id ?? null, description: first?.description ?? null });
+});
+
+// PUT /tasks/note — upsert the task-group note by name. The note lives on the
+// group's first block (chunkIndex 1), like description/link/plays elsewhere. We
+// edit the most recent group (any day) in place; only when no group exists at
+// all do we create a fresh block (today) to hold the note.
+router.put("/tasks/note", async (req, res) => {
+  const parsed = UpdateTaskNoteBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+
+  const { name } = parsed.data;
+  // Empty/whitespace clears the note (stored as null), matching PATCH /tasks/:id.
+  const description = parsed.data.description.trim() || null;
+  const today = getEasternDateString();
+
+  // Serialize concurrent upserts for the same name so the create path can't
+  // insert two competing "first blocks" (read-then-insert race). The advisory
+  // lock is released automatically when the transaction ends.
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${name}))`);
+
+    const [first] = await tx
+      .select()
+      .from(tasksTable)
+      .where(eq(tasksTable.name, name))
+      .orderBy(desc(tasksTable.date), asc(tasksTable.chunkIndex))
+      .limit(1);
+
+    if (first) {
+      const [updated] = await tx
+        .update(tasksTable)
+        .set({ description })
+        .where(eq(tasksTable.id, first.id))
+        .returning();
+      return { taskId: updated.id, description: updated.description ?? null };
+    }
+
+    // No group anywhere. Only materialize an open block when there's real note
+    // content, so empty saves don't litter the planner with placeholder blocks.
+    if (description === null) {
+      return { taskId: null, description: null };
+    }
+
+    const [created] = await tx
+      .insert(tasksTable)
+      .values({
+        name,
+        date: today,
+        chunkIndex: 1,
+        totalChunks: 1,
+        completed: false,
+        description,
+      })
+      .returning();
+    return { taskId: created.id, description: created.description ?? null };
+  });
+
+  res.json(result);
 });
 
 // PATCH /tasks/:id

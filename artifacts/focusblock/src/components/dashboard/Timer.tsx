@@ -2,10 +2,17 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Pause, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { playAlertTone, primeAudio } from "@/lib/audio";
 import { requestNotificationPermission, showNotification } from "@/lib/notifications";
-import { useCompleteFocus, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
+import {
+  useCompleteFocus,
+  useGetTaskNote,
+  useUpdateTaskNote,
+  getGetTaskNoteQueryKey,
+  getGetTodayStatsQueryKey,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { RatingModal } from "./RatingModal";
@@ -39,7 +46,78 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
 
   const queryClient = useQueryClient();
   const completeFocus = useCompleteFocus();
+  const updateTaskNote = useUpdateTaskNote();
   const { toast } = useToast();
+
+  // The active task's note (the same task-group `description` shown in the
+  // timeline). The Timer only knows the name, so look the note up by name.
+  const [noteDraft, setNoteDraft] = useState("");
+  // Last value loaded from / saved to the server, to skip no-op saves.
+  const loadedNoteRef = useRef("");
+  // True while the textarea is focused, so a background refetch (e.g. on window
+  // focus or post-save invalidation) can't overwrite in-progress edits.
+  const isEditingNoteRef = useRef(false);
+
+  // Debounce the name so typing a fresh task title char-by-char doesn't fire a
+  // lookup per keystroke. Clicking a planner task / running a session keeps the
+  // name stable, so the note resolves immediately in those (common) cases.
+  const trimmedName = activeTaskName.trim();
+  const [noteName, setNoteName] = useState(trimmedName);
+  useEffect(() => {
+    const t = setTimeout(() => setNoteName(trimmedName), 350);
+    return () => clearTimeout(t);
+  }, [trimmedName]);
+
+  const noteQuery = useGetTaskNote(
+    { name: noteName },
+    {
+      query: {
+        queryKey: getGetTaskNoteQueryKey({ name: noteName }),
+        enabled: noteName.length > 0,
+      },
+    },
+  );
+
+  // Sync the draft when the resolved note changes (task switched or refetched).
+  const noteData = noteQuery.data;
+  useEffect(() => {
+    if (!noteData) return;
+    // Never clobber what the user is actively typing.
+    if (isEditingNoteRef.current) return;
+    const text = noteData.description ?? "";
+    loadedNoteRef.current = text;
+    setNoteDraft(text);
+  }, [noteData]);
+
+  // Clear the draft immediately when there's no active task to attach a note to.
+  useEffect(() => {
+    if (noteName.length === 0) {
+      loadedNoteRef.current = "";
+      setNoteDraft("");
+    }
+  }, [noteName]);
+
+  const saveNote = useCallback(async () => {
+    const name = activeTaskName.trim();
+    if (!name) return;
+    if (noteDraft.trim() === loadedNoteRef.current.trim()) return;
+    try {
+      const result = await updateTaskNote.mutateAsync({
+        data: { name, description: noteDraft },
+      });
+      loadedNoteRef.current = result.description ?? "";
+      queryClient.invalidateQueries({ queryKey: getGetTaskNoteQueryKey({ name }) });
+      queryClient.invalidateQueries({ queryKey: ["timeline"] });
+      queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
+    } catch (err) {
+      console.error("Failed to save note", err);
+      toast({
+        title: "Couldn't save your note",
+        description: "Something went wrong saving this note. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [activeTaskName, noteDraft, updateTaskNote, queryClient, toast]);
 
   const stopTitleFlash = useCallback(() => {
     if (titleFlashRef.current) {
@@ -264,6 +342,32 @@ export function Timer({ activeTaskName, onTaskNameChange, startToken }: TimerPro
               <RotateCcw className="w-5 h-5" />
             </Button>
           </div>
+
+          {mode === "focus" && trimmedName && (
+            <div className="w-full max-w-xs mt-10 pt-6 border-t border-border/40">
+              <label
+                htmlFor="focus-note"
+                className="block text-[0.7rem] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 mb-2"
+              >
+                Notes
+              </label>
+              <Textarea
+                id="focus-note"
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                onFocus={() => {
+                  isEditingNoteRef.current = true;
+                }}
+                onBlur={() => {
+                  isEditingNoteRef.current = false;
+                  void saveNote();
+                }}
+                placeholder="Jot what you're working on…"
+                rows={3}
+                className="resize-none border-border/50 bg-transparent text-sm leading-relaxed placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 

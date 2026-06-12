@@ -7,10 +7,13 @@
  */
 
 export * from './completeFocusInput';
+export * from './getTaskNoteParams';
 export * from './getTimelineParams';
 export * from './healthStatus';
 export * from './task';
 export * from './taskInput';
+export * from './taskNote';
+export * from './taskNoteInput';
 export * from './taskUpdate';
 export * from './taskUpdateRating';
 export * from './timelinePage';
