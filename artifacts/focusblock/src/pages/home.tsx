@@ -31,7 +31,7 @@ export default function Home() {
           </div>
         </div>
         <div className="w-full flex-1 min-w-0">
-          <Timeline onTaskSelect={setActiveTaskName} onTaskStart={handleTaskStart} />
+          <Timeline onTaskSelect={setActiveTaskName} onTaskStart={handleTaskStart} onCollapse={() => setExpanded(false)} />
         </div>
       </main>
     </div>

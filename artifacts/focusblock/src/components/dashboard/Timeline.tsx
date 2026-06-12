@@ -22,6 +22,7 @@ import { normalizeUrl, linkHost } from "@/lib/url";
 interface TimelineProps {
   onTaskSelect: (taskName: string) => void;
   onTaskStart: (taskName: string) => void;
+  onCollapse: () => void;
 }
 
 type TaskGroup = {
@@ -83,7 +84,7 @@ function groupByName(tasks: Task[]): TaskGroup[] {
   });
 }
 
-export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
+export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProps) {
   const [newTaskName, setNewTaskName] = useState("");
   const [blockCount, setBlockCount] = useState<number>(1);
 
@@ -273,6 +274,7 @@ export function Timeline({ onTaskSelect, onTaskStart }: TimelineProps) {
             placeholder="What's next?"
             value={newTaskName}
             onChange={(e) => setNewTaskName(e.target.value)}
+            onFocus={onCollapse}
             className="flex-1 h-11 bg-card border-border/60"
           />
           <div className="flex items-center bg-card rounded-md overflow-hidden border border-border/60">
