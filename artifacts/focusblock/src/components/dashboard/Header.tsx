@@ -15,7 +15,7 @@ export function Header() {
       </Link>
       <Link
         href="/about"
-        className="rounded-full bg-accent/50 px-3.5 py-1.5 text-xs tracking-[0.12em] uppercase text-accent-foreground/80 hover:bg-accent hover:text-accent-foreground transition-colors"
+        className="text-xs tracking-[0.12em] uppercase text-muted-foreground hover:text-foreground transition-colors"
       >
         About
       </Link>
