@@ -4,6 +4,7 @@ import {
   useUpdateTask,
   useDeleteTask,
   useRenameTaskGroup,
+  useAddBlock,
   useGetTodayStats,
   getTimeline,
   getGetTodayStatsQueryKey,
@@ -13,7 +14,7 @@ import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Play, Check, AlignLeft, Link2, ExternalLink, X, Pencil } from "lucide-react";
+import { Plus, Minus, Trash2, Play, Link2, ExternalLink, X, AlignJustify } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { BudgetMeter } from "./BudgetMeter";
@@ -134,6 +135,7 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const renameTaskGroup = useRenameTaskGroup();
+  const addBlockMutation = useAddBlock();
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["timeline"] });
@@ -232,6 +234,28 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
       refresh();
     } catch (err) {
       console.error("Failed to delete task group", err);
+    }
+  };
+
+  const handleAddBlock = async (group: TaskGroup) => {
+    try {
+      await addBlockMutation.mutateAsync({ data: { name: group.name } });
+      refresh();
+    } catch (err) {
+      console.error("Failed to add block", err);
+    }
+  };
+
+  const handleRemoveBlock = async (group: TaskGroup) => {
+    // Remove the last open (uncompleted) block, if any.
+    const openBlocks = group.blocks.filter((b) => !b.completed);
+    if (openBlocks.length === 0) return;
+    const last = openBlocks[openBlocks.length - 1];
+    try {
+      await deleteTask.mutateAsync({ id: last.id });
+      refresh();
+    } catch (err) {
+      console.error("Failed to remove block", err);
     }
   };
 
@@ -365,6 +389,8 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
                   onRename={handleRename}
                   onDelete={handleDeleteGroup}
                   onSelect={onTaskSelect}
+                  onAddBlock={handleAddBlock}
+                  onRemoveBlock={handleRemoveBlock}
                 />
               ))}
             </div>
@@ -396,6 +422,8 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
                       onRename={handleRename}
                       onDelete={handleDeleteGroup}
                       onSelect={onTaskSelect}
+                      onAddBlock={handleAddBlock}
+                      onRemoveBlock={handleRemoveBlock}
                     />
                   ))}
                 </div>
@@ -423,9 +451,11 @@ interface TimelineGroupProps {
   onRename: (group: TaskGroup, newName: string) => void;
   onDelete: (blocks: Task[]) => void;
   onSelect: (name: string) => void;
+  onAddBlock: (group: TaskGroup) => void;
+  onRemoveBlock: (group: TaskGroup) => void;
 }
 
-function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMeta, onRename, onDelete, onSelect }: TimelineGroupProps) {
+function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMeta, onRename, onDelete, onSelect, onAddBlock, onRemoveBlock }: TimelineGroupProps) {
   const allDone = group.completedCount === group.blocks.length;
   const hasPending = !allDone;
   const overEstimate = group.completedCount > group.totalEstimated;
@@ -509,27 +539,46 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
   return (
     <div className={`group rounded-lg px-3 py-3 transition-colors hover:bg-muted/30 ${allDone ? "opacity-70" : ""}`}>
       <div className="flex items-start gap-3">
-        {/* Block dots — only when there's something still to do */}
+        {/* Block dots with − / + stepper — only when there's something still to do */}
         {hasPending && (
-          <div className="flex flex-wrap gap-1.5 flex-shrink-0 mt-1" style={{ maxWidth: "7rem" }}>
-            {group.blocks.map((block) => (
+          <div className="flex items-center gap-1 flex-shrink-0 mt-1">
+            <button
+              type="button"
+              title="Remove a block"
+              onClick={() => onRemoveBlock(group)}
+              disabled={group.blocks.filter((b) => !b.completed).length <= 1}
+              className="w-4 h-4 inline-flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground disabled:opacity-20 transition-colors focus:outline-none opacity-0 group-hover:opacity-100"
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <div className="flex flex-wrap gap-1.5" style={{ maxWidth: "7rem" }}>
+              {group.blocks.map((block) => (
+                <button
+                  key={block.id}
+                  title={block.completed ? `Block ${block.chunkIndex} — done` : `Block ${block.chunkIndex} — mark done`}
+                  onClick={() => onToggleBlock(block)}
+                  className={`w-4 h-4 rounded-[3px] border-2 transition-all hover:scale-110 focus:outline-none ${
+                    block.completed
+                      ? "bg-primary border-primary"
+                      : "bg-transparent border-muted-foreground/40 hover:border-primary/60"
+                  }`}
+                />
+              ))}
               <button
-                key={block.id}
-                title={block.completed ? `Block ${block.chunkIndex} — done` : `Block ${block.chunkIndex} — mark done`}
-                onClick={() => onToggleBlock(block)}
-                className={`w-4 h-4 rounded-[3px] border-2 transition-all hover:scale-110 focus:outline-none ${
-                  block.completed
-                    ? "bg-primary border-primary"
-                    : "bg-transparent border-muted-foreground/40 hover:border-primary/60"
-                }`}
-              />
-            ))}
+                type="button"
+                title="Add a block"
+                onClick={() => onAddBlock(group)}
+                className="w-4 h-4 rounded-[3px] border border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 transition-colors hover:text-primary hover:border-primary/50 focus:outline-none opacity-0 group-hover:opacity-100"
+              >
+                <Plus className="w-2.5 h-2.5" />
+              </button>
+            </div>
           </div>
         )}
 
         {allDone && (
           <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Check className="w-3 h-3 text-primary" />
+            <span className="text-primary text-[10px] font-bold">✓</span>
           </div>
         )}
 
@@ -553,15 +602,14 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
             />
           ) : (
             <span
-              className={`font-medium truncate block ${hasPending ? "cursor-pointer" : ""} ${allDone ? "text-muted-foreground" : "text-foreground"}`}
-              onClick={() => hasPending && onSelect(group.name)}
+              className={`font-medium truncate block cursor-text ${allDone ? "text-muted-foreground" : "text-foreground"}`}
+              onClick={beginEditTitle}
             >
               {group.name}
             </span>
           )}
 
-          {/* Meta line: counts on the left, hover actions on the right —
-              keeping the actions here means they never steal title width */}
+          {/* Meta line: counts + plays on left, hover actions on right */}
           <div className="mt-0.5 flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground font-mono flex items-center gap-2">
               <span>
@@ -585,41 +633,23 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
             >
               <button
                 type="button"
-                title="Rename task"
-                onClick={beginEditTitle}
-                className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                title={hasMeta ? "Show note & link" : "Add a note or link"}
+                title={expanded ? "Hide note" : "Note"}
                 onClick={() => setExpanded((v) => !v)}
                 className={`w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-primary/10 transition-colors ${
                   expanded ? "text-primary" : "text-muted-foreground hover:text-primary"
                 }`}
               >
-                {hasMeta ? <AlignLeft className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                <AlignJustify className="w-3.5 h-3.5" />
               </button>
               {hasPending && (
-                <>
-                  <button
-                    type="button"
-                    title="Mark all done"
-                    onClick={() => onCompleteAll(group)}
-                    className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Start a 30-min focus block for this task"
-                    onClick={() => onPlay(group)}
-                    className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                  </button>
-                </>
+                <button
+                  type="button"
+                  title="Start focus block"
+                  onClick={() => onPlay(group)}
+                  className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                </button>
               )}
               <button
                 type="button"
@@ -697,7 +727,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
                 }}
                 className="text-muted-foreground/40 hover:text-primary transition-colors flex-shrink-0"
               >
-                <Pencil className="w-3.5 h-3.5" />
+                <X className="w-3 h-3" />
               </button>
               <button
                 type="button"
