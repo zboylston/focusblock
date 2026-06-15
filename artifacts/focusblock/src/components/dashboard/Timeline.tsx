@@ -546,8 +546,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               type="button"
               title="Remove a block"
               onClick={() => onRemoveBlock(group)}
-              disabled={group.blocks.filter((b) => !b.completed).length <= 1}
-              className="w-4 h-4 inline-flex items-center justify-center rounded text-muted-foreground/50 hover:text-foreground disabled:opacity-20 transition-colors focus:outline-none opacity-0 group-hover:opacity-100"
+              className="w-4 h-4 inline-flex items-center justify-center rounded text-muted-foreground/70 hover:text-foreground transition-colors focus:outline-none opacity-0 group-hover:opacity-100"
             >
               <Minus className="w-3 h-3" />
             </button>
@@ -618,12 +617,6 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
                   <span className="ml-1 text-amber-500">+{group.completedCount - group.totalEstimated} over</span>
                 )}
               </span>
-              {group.plays > 0 && (
-                <span className="flex items-center gap-0.5 text-primary/80">
-                  <Play className="w-3 h-3 fill-current" />
-                  {group.plays}
-                </span>
-              )}
             </span>
 
             <div
