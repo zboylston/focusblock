@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, tasksTable } from "@workspace/db";
-import { eq, and, asc, desc, lt, inArray, sql } from "drizzle-orm";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
 import {
   CreateTasksBody,
   CompleteFocusBody,
@@ -90,16 +90,21 @@ router.get("/tasks/timeline", async (req, res) => {
     : 7;
   const before = beforeRaw;
 
-  const dayFilter = before ? lt(tasksTable.date, before) : undefined;
+  // A block's "log day" is the Eastern calendar day it was COMPLETED, falling
+  // back to its planned date while still open. The timeline is therefore a
+  // record of when work happened, not when it was created.
+  const logDay = sql`CASE WHEN ${tasksTable.completed} AND ${tasksTable.completedAt} IS NOT NULL THEN to_char(${tasksTable.completedAt} AT TIME ZONE 'America/New_York', 'YYYY-MM-DD') ELSE to_char(${tasksTable.date}, 'YYYY-MM-DD') END`;
 
-  const dayRows = await db
-    .selectDistinct({ date: tasksTable.date })
-    .from(tasksTable)
-    .where(dayFilter)
-    .orderBy(desc(tasksTable.date))
-    .limit(limit);
+  const dayRows = await db.execute(sql`
+    SELECT DISTINCT log_day FROM (
+      SELECT ${logDay} AS log_day FROM ${tasksTable}
+    ) sub
+    ${before ? sql`WHERE log_day < ${before}` : sql``}
+    ORDER BY log_day DESC
+    LIMIT ${limit}
+  `);
 
-  const days = dayRows.map((d) => d.date);
+  const days = (dayRows.rows as { log_day: string }[]).map((d) => d.log_day);
 
   if (days.length === 0) {
     res.json({ tasks: [], nextCursor: null, hasMore: false });
@@ -111,20 +116,22 @@ router.get("/tasks/timeline", async (req, res) => {
   const tasks = await db
     .select()
     .from(tasksTable)
-    .where(inArray(tasksTable.date, days))
+    .where(sql`(${logDay}) IN (${sql.join(days.map((d) => sql`${d}`), sql`, `)})`)
     .orderBy(
-      desc(tasksTable.date),
+      sql`(${logDay}) DESC`,
       asc(tasksTable.createdAt),
       asc(tasksTable.chunkIndex),
     );
 
-  const [older] = await db
-    .select({ date: tasksTable.date })
-    .from(tasksTable)
-    .where(lt(tasksTable.date, oldest))
-    .limit(1);
+  const olderRows = await db.execute(sql`
+    SELECT 1 FROM (
+      SELECT ${logDay} AS log_day FROM ${tasksTable}
+    ) sub
+    WHERE log_day < ${oldest}
+    LIMIT 1
+  `);
 
-  const hasMore = Boolean(older);
+  const hasMore = olderRows.rows.length > 0;
   res.json({
     tasks: tasks.map(serializeTask),
     nextCursor: hasMore ? oldest : null,

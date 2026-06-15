@@ -38,7 +38,7 @@ A full-stack time-blocking and focus timer app for deep work. Track 30-minute fo
 - Rating/notes live on the block row (`rating`, `notes`); applied via PATCH after completion
 - The "chunks until 5 PM" counter uses `Intl.DateTimeFormat` to compute EST offset regardless of user timezone
 - Audio alert uses the Web Audio API (oscillator) — no external file needed
-- The timeline paginates by distinct calendar day, newest-first, via a `before` (YYYY-MM-DD) cursor — `GET /tasks/timeline`
+- The timeline paginates by distinct "log day", newest-first, via a `before` (YYYY-MM-DD) cursor — `GET /tasks/timeline`. A block's log day is the Eastern day it was COMPLETED (`completedAt`), falling back to its planned `date` while still open — so the timeline records when work happened, not when it was created. The server computes this `log_day` in SQL (`completed_at AT TIME ZONE 'America/New_York'`) for distinct-day pagination + selection; the client mirrors it in `logDayOf()` to bucket day sections identically
 
 ## Product
 

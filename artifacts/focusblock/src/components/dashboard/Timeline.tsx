@@ -72,6 +72,26 @@ function easternToday(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
 }
 
+// Eastern calendar day (YYYY-MM-DD) for an instant.
+function easternDateOf(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso));
+}
+
+// The day a fully-completed group is logged under: the latest Eastern day any of
+// its blocks was completed. Falls back to the planned date if (somehow) none has
+// a timestamp. Mirrors the server's `log_day`, but resolved per-GROUP so a group
+// is never split across day buckets (which would orphan chunkIndex-1 metadata).
+function groupCompletionDay(g: TaskGroup): string {
+  let latest = "";
+  for (const b of g.blocks) {
+    if (b.completed && b.completedAt) {
+      const d = easternDateOf(b.completedAt);
+      if (d > latest) latest = d;
+    }
+  }
+  return latest || g.blocks[0].date;
+}
+
 function shiftDay(dateStr: string, days: number): string {
   const d = parseISO(dateStr);
   d.setDate(d.getDate() + days);
@@ -144,34 +164,47 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
 
   const { openGroups, daySections } = useMemo(() => {
     const allTasks = data?.pages.flatMap((p) => p.tasks) ?? [];
-    const byDate = new Map<string, Task[]>();
+    // Group WHOLE by (planned date, name) first so group-level metadata
+    // (chunkIndex 1) and actions (rename/delete/note) always see the full group
+    // — a group is never split across day buckets.
+    const byGroup = new Map<string, Task[]>();
     for (const t of allTasks) {
-      const existing = byDate.get(t.date) ?? [];
+      const key = `${t.date}\u0000${t.name}`;
+      const existing = byGroup.get(key) ?? [];
       existing.push(t);
-      byDate.set(t.date, existing);
+      byGroup.set(key, existing);
     }
 
     const collectedOpen: TaskGroup[] = [];
-    const sections: DaySection[] = [];
+    const doneByDay = new Map<string, TaskGroup[]>();
 
-    for (const [date, tasks] of byDate.entries()) {
-      const completedBlocks = tasks.filter((t) => t.completed).length;
-      const groups = groupByName(tasks);
-
-      const pending = groups.filter((g) => g.completedCount < g.blocks.length);
-      const done = groups.filter((g) => g.completedCount === g.blocks.length);
-
-      collectedOpen.push(...pending);
-
-      // Done groups under the day divider in chronological order.
-      done.sort((a, b) =>
-        new Date(a.blocks[0].createdAt).getTime() - new Date(b.blocks[0].createdAt).getTime()
-      );
-
-      if (completedBlocks > 0) {
-        sections.push({ date, groups: done, completedBlocks, minutes: completedBlocks * 30 });
+    for (const blocks of byGroup.values()) {
+      const [group] = groupByName(blocks); // single (name, date) group
+      if (group.completedCount < group.blocks.length) {
+        // Still has open blocks → float to top as the active plan; its completed
+        // blocks show inline under the card.
+        collectedOpen.push(group);
+      } else {
+        // Fully done → log under the day it was completed, not created.
+        const day = groupCompletionDay(group);
+        const list = doneByDay.get(day) ?? [];
+        list.push(group);
+        doneByDay.set(day, list);
       }
     }
+
+    // Day sections, newest day first.
+    const sections: DaySection[] = [...doneByDay.keys()]
+      .sort((a, b) => (a < b ? 1 : -1))
+      .map((date) => {
+        const done = doneByDay.get(date)!;
+        done.sort(
+          (a, b) =>
+            new Date(a.blocks[0].createdAt).getTime() - new Date(b.blocks[0].createdAt).getTime(),
+        );
+        const completedBlocks = done.reduce((n, g) => n + g.completedCount, 0);
+        return { date, groups: done, completedBlocks, minutes: completedBlocks * 30 };
+      });
 
     // Open tasks float above all day dividers, newest-added first.
     collectedOpen.sort((a, b) =>
