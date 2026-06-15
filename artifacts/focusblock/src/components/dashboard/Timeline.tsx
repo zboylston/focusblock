@@ -548,7 +548,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               onClick={() => onRemoveBlock(group)}
               className="w-4 h-4 inline-flex items-center justify-center rounded text-muted-foreground/70 hover:text-foreground transition-colors focus:outline-none opacity-0 group-hover:opacity-100"
             >
-              <Minus className="w-3.5 h-3.5" strokeWidth={2.5} />
+              <Minus className="w-3 h-3" strokeWidth={2.5} />
             </button>
             <div className="flex flex-wrap gap-1.5" style={{ maxWidth: "7rem" }}>
               {group.blocks.map((block) => (
@@ -569,7 +569,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
                 onClick={() => onAddBlock(group)}
                 className="w-4 h-4 rounded-[3px] border border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground/50 transition-colors hover:text-primary hover:border-primary/50 focus:outline-none opacity-0 group-hover:opacity-100"
               >
-                <Plus className="w-2.5 h-2.5" />
+                <Plus className="w-2.5 h-2.5" strokeWidth={2.5} />
               </button>
             </div>
           </div>
