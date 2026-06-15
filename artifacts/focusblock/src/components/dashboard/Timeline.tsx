@@ -542,7 +542,7 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
         {/* Block dots with − / + stepper — only when there's something still to do */}
         {hasPending && (
           <div className="flex items-center gap-1 flex-shrink-0 mt-1">
-            {group.blocks.length > 1 && (
+            {group.blocks.length > 1 ? (
               <button
                 type="button"
                 title="Remove a block"
@@ -551,6 +551,8 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               >
                 <Minus className="w-3 h-3" strokeWidth={2.5} />
               </button>
+            ) : (
+              <span className="w-4 h-4 flex-shrink-0" aria-hidden />
             )}
             <div className="flex flex-wrap gap-1.5" style={{ maxWidth: "7rem" }}>
               {group.blocks.map((block) => (
