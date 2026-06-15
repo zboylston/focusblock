@@ -26,12 +26,12 @@ const steps = [
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-white text-foreground flex flex-col font-sans">
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
       <Header />
       <main className="flex-1 w-full max-w-2xl mx-auto px-6 py-16 md:py-24">
         <header className="mb-16">
-          <p className="text-xs tracking-[0.2em] text-muted-foreground mb-4">
-            about
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-4">
+            About
           </p>
           <h1 className="text-3xl md:text-4xl font-medium tracking-tight text-foreground leading-tight">
             Deep work, one quiet block at a time.
