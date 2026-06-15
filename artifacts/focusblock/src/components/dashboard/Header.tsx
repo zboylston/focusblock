@@ -15,9 +15,9 @@ export function Header() {
       </Link>
       <Link
         href="/about"
-        className="text-xs tracking-[0.12em] uppercase text-muted-foreground hover:text-foreground transition-colors"
+        className="text-xs tracking-[0.12em] text-muted-foreground hover:text-foreground transition-colors"
       >
-        About
+        about
       </Link>
     </header>
   );
