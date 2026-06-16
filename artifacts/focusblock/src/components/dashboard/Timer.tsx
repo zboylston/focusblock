@@ -504,6 +504,9 @@ export function Timer({
                   placeholder="What are you focusing on?"
                   value={activeTaskName}
                   onChange={(e) => onTaskNameChange(e.target.value)}
+                  onFocus={() => {
+                    if (trimmedName) onExpandedChange(true);
+                  }}
                   className="text-center bg-transparent border-t-0 border-x-0 border-b-2 border-border/50 focus-visible:border-primary focus-visible:ring-0 rounded-none px-0 text-base text-foreground placeholder:text-muted-foreground/50 h-12"
                 />
               )
@@ -522,6 +525,7 @@ export function Timer({
                 onChange={(e) => setSubtaskDraft(e.target.value)}
                 onFocus={() => {
                   isEditingSubtaskRef.current = true;
+                  onExpandedChange(true);
                 }}
                 onBlur={() => {
                   isEditingSubtaskRef.current = false;
@@ -643,6 +647,7 @@ export function Timer({
                 onChange={setNoteDraft}
                 onFocus={() => {
                   isEditingNoteRef.current = true;
+                  onExpandedChange(true);
                 }}
                 onBlur={() => {
                   isEditingNoteRef.current = false;
