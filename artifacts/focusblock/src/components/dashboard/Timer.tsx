@@ -571,6 +571,16 @@ export function Timer({
             </Button>
           </div>
 
+          {mode === "break" && (
+            <button
+              type="button"
+              onClick={() => switchMode("focus")}
+              className="mt-4 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              skip break
+            </button>
+          )}
+
           {mode === "focus" && trimmedName && hasGroup && group && (
             <div className="w-full max-w-xs mt-10 pt-6 border-t border-border/40 space-y-4">
               <div className="flex items-center justify-between gap-3">
