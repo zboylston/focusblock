@@ -303,6 +303,7 @@ export function Timer({
       }
     } else {
       // Break finished — return to a fresh focus block.
+      stopAlertTone();
       stopTitleFlash();
       setMode("focus");
       setTimeLeft(FOCUS_SECONDS);
