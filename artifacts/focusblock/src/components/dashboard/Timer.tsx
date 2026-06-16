@@ -352,6 +352,7 @@ export function Timer({
     stopAlertTone();
     stopTitleFlash();
     setShowRatingModal(false);
+    setBreakDone(false);
     setMode("focus");
     setTimeLeft(FOCUS_SECONDS);
     // Set a valid fresh end time synchronously so any still-running interval
@@ -414,6 +415,7 @@ export function Timer({
     stopAlertTone();
     setShowRatingModal(false);
     stopTitleFlash();
+    setBreakDone(false);
     // Clear the focus label so the finished task's title doesn't linger.
     onTaskNameChange("");
     setMode("break");
@@ -429,6 +431,7 @@ export function Timer({
     stopAlertTone();
     stopTitleFlash();
     setShowRatingModal(false);
+    setBreakDone(false);
     await addExtraBlock(activeTaskName);
     setMode("focus");
     setTimeLeft(FOCUS_SECONDS);
@@ -558,7 +561,7 @@ export function Timer({
             {timeString}
           </div>
 
-          {breakDone ? (
+          {mode === "break" && breakDone ? (
             <Button
               size="lg"
               className="h-14 px-8 text-base rounded-full animate-pulse"
