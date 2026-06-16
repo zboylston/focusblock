@@ -49,6 +49,7 @@ export function Timer({
   const [isActive, setIsActive] = useState(false);
   const [completedTaskId, setCompletedTaskId] = useState<number | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [breakDone, setBreakDone] = useState(false);
   // Bumped on every fresh (re)start so the countdown effect reliably tears down
   // and rebuilds its interval, even when the timer was already running.
   const [runId, setRunId] = useState(0);
@@ -302,11 +303,9 @@ export function Timer({
         });
       }
     } else {
-      // Break finished — return to a fresh focus block.
-      stopAlertTone();
+      // Break finished — keep alert ringing until user explicitly dismisses.
       stopTitleFlash();
-      setMode("focus");
-      setTimeLeft(FOCUS_SECONDS);
+      setBreakDone(true);
     }
   }, [mode, activeTaskName, completeFocus, queryClient, startTitleFlash, stopTitleFlash, toast]);
 
@@ -389,6 +388,7 @@ export function Timer({
     stopAlertTone();
     setIsActive(false);
     endTimeRef.current = null;
+    setBreakDone(false);
     setTimeLeft(mode === "focus" ? FOCUS_SECONDS : BREAK_SECONDS);
     onExpandedChange(false);
   };
@@ -397,9 +397,17 @@ export function Timer({
     stopAlertTone();
     setIsActive(false);
     endTimeRef.current = null;
+    setBreakDone(false);
     setMode(next);
     setTimeLeft(next === "focus" ? FOCUS_SECONDS : BREAK_SECONDS);
     if (next === "break") onExpandedChange(false);
+  };
+
+  const dismissBreak = () => {
+    stopAlertTone();
+    setBreakDone(false);
+    setMode("focus");
+    setTimeLeft(FOCUS_SECONDS);
   };
 
   const handleRatingComplete = () => {
@@ -550,6 +558,15 @@ export function Timer({
             {timeString}
           </div>
 
+          {breakDone ? (
+            <Button
+              size="lg"
+              className="h-14 px-8 text-base rounded-full animate-pulse"
+              onClick={dismissBreak}
+            >
+              I'm back
+            </Button>
+          ) : (
           <div className="flex items-center gap-4">
             <Button
               size="lg"
@@ -570,8 +587,9 @@ export function Timer({
               <RotateCcw className="w-5 h-5" />
             </Button>
           </div>
+          )}
 
-          {mode === "break" && (
+          {!breakDone && mode === "break" && (
             <button
               type="button"
               onClick={() => switchMode("focus")}
