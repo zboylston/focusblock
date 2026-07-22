@@ -508,7 +508,7 @@ export function Timer({
           <div className="w-full max-w-xs mb-8">
             {mode === "focus" ? (
               isActive ? (
-                <div className="text-center text-xl font-bold text-primary h-12 flex items-center justify-center truncate px-1">
+                <div className="text-center text-xl font-bold text-primary min-h-12 flex items-center justify-center flex-wrap px-1 py-1 leading-snug">
                   {activeTaskName || "Deep work"}
                 </div>
               ) : (
