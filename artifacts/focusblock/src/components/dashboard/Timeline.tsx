@@ -386,9 +386,6 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
             <Plus className="w-4 h-4 mr-1" /> Add
           </Button>
         </form>
-        <p className="mt-1.5 text-[11px] text-muted-foreground/40 tracking-wide text-right pr-[88px]">
-          each block · 30 min of deep focus
-        </p>
 
         {/* Today summary */}
         <div className="mt-4 flex items-center gap-6 text-sm text-muted-foreground">
