@@ -356,18 +356,27 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
             onFocus={onCollapse}
             className="flex-1 h-11 bg-card border-border/60"
           />
-          <div className="flex items-center bg-card rounded-md overflow-hidden border border-border/60">
+          <div className="flex items-center bg-card rounded-md overflow-hidden border border-border/60 h-11">
             <button
               type="button"
-              className="px-3 h-11 text-muted-foreground hover:bg-muted/40 transition-colors"
+              className="px-3 h-full text-muted-foreground hover:bg-muted/40 transition-colors text-base leading-none"
               onClick={() => setBlockCount(Math.max(1, blockCount - 1))}
             >
               –
             </button>
-            <div className="w-8 text-center text-sm font-medium tabular-nums">{blockCount}</div>
+            <div className="w-16 flex flex-col items-center justify-center gap-[3px]">
+              <span className="text-sm font-medium tabular-nums leading-none">{blockCount}</span>
+              <span className="text-[10px] text-muted-foreground/50 tabular-nums leading-none">
+                {blockCount * 30 < 60
+                  ? `${blockCount * 30} min`
+                  : Number.isInteger(blockCount / 2)
+                    ? `${blockCount / 2} hr`
+                    : `${Math.floor(blockCount / 2)}½ hr`}
+              </span>
+            </div>
             <button
               type="button"
-              className="px-3 h-11 text-muted-foreground hover:bg-muted/40 transition-colors"
+              className="px-3 h-full text-muted-foreground hover:bg-muted/40 transition-colors text-base leading-none"
               onClick={() => setBlockCount(Math.min(16, blockCount + 1))}
             >
               +
@@ -377,6 +386,9 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
             <Plus className="w-4 h-4 mr-1" /> Add
           </Button>
         </form>
+        <p className="mt-1.5 text-[11px] text-muted-foreground/40 tracking-wide text-right pr-[88px]">
+          each block · 30 min of deep focus
+        </p>
 
         {/* Today summary */}
         <div className="mt-4 flex items-center gap-6 text-sm text-muted-foreground">
