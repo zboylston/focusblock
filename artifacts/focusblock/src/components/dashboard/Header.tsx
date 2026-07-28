@@ -1,5 +1,6 @@
-import { Clock } from "lucide-react";
 import { Link } from "wouter";
+
+const logoMark = `${import.meta.env.BASE_URL}logo-mark.png`;
 
 export function Header() {
   return (
@@ -8,7 +9,7 @@ export function Header() {
         href="/"
         className="flex items-center gap-2.5 group"
       >
-        <Clock className="w-[18px] h-[18px] text-primary" strokeWidth={1.5} />
+        <img src={logoMark} alt="FocusBlock logo" className="w-[20px] h-[20px]" />
         <span className="text-base font-medium tracking-[0.16em] text-foreground/90 group-hover:text-foreground transition-colors">
           FocusBlock
         </span>
