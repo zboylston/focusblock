@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm --filter @workspace/focusblock run build",
+  "outputDirectory": "artifacts/focusblock/dist/public",
+  "framework": "vite",
   "rewrites": [
     {
       "source": "/api/:path*",
