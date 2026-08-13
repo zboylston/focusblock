@@ -3,6 +3,11 @@
   "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/focusblock run build",
   "outputDirectory": "artifacts/focusblock/dist/public",
   "framework": "vite",
+  "functions": {
+    "api/[...path].cjs": {
+      "includeFiles": "artifacts/api-server/dist/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
