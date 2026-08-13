@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import { ensureTasksTable } from "@workspace/db";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -28,6 +29,19 @@ app.use(
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use("/api", async (req, _res, next) => {
+  if (req.originalUrl.split("?")[0] === "/api/healthz") {
+    next();
+    return;
+  }
+  try {
+    await ensureTasksTable();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.use("/api", router);
 

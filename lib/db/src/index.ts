@@ -21,6 +21,7 @@ function createPool() {
 
 let _pool: pg.Pool | undefined;
 let _db: ReturnType<typeof drizzle<typeof schema>> | undefined;
+let _schemaReady: Promise<void> | undefined;
 
 export function getPool() {
   if (!_pool) {
@@ -34,6 +35,30 @@ export function getDb() {
     _db = drizzle(getPool(), { schema });
   }
   return _db;
+}
+
+export function ensureTasksTable() {
+  _schemaReady ??= getPool()
+    .query(`
+      CREATE TABLE IF NOT EXISTS "tasks" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "name" text NOT NULL,
+        "date" date NOT NULL,
+        "chunk_index" integer DEFAULT 1 NOT NULL,
+        "total_chunks" integer DEFAULT 1 NOT NULL,
+        "completed" boolean DEFAULT false NOT NULL,
+        "plays" integer DEFAULT 0 NOT NULL,
+        "description" text,
+        "link" text,
+        "subtask" text,
+        "rating" text,
+        "notes" text,
+        "completed_at" timestamp with time zone,
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+      )
+    `)
+    .then(() => undefined);
+  return _schemaReady;
 }
 
 export const pool = new Proxy({} as pg.Pool, {
