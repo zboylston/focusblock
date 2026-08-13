@@ -4,21 +4,8 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-function databaseUrl() {
-  // Neon's pooled DATABASE_URL goes through PgBouncer, which rejects the
-  // prepared statements node-postgres/Drizzle use. Prefer the direct URL on Vercel.
-  if (process.env.VERCEL) {
-    return (
-      process.env.DATABASE_URL_UNPOOLED ||
-      process.env.DATABASE_POSTGRES_URL_NON_POOLING ||
-      process.env.DATABASE_URL
-    );
-  }
-  return process.env.DATABASE_URL;
-}
-
 function createPool() {
-  const url = databaseUrl();
+  const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
       "DATABASE_URL must be set. Did you forget to provision a database?",
