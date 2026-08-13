@@ -4,7 +4,7 @@
   "outputDirectory": "artifacts/focusblock/dist/public",
   "framework": "vite",
   "functions": {
-    "api/[...path].cjs": {
+    "api/**": {
       "includeFiles": "artifacts/api-server/dist/**"
     }
   },
