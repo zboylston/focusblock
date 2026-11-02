@@ -14,7 +14,7 @@ import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Minus, Trash2, Play, Link2, ExternalLink, X, AlignJustify } from "lucide-react";
+import { Plus, Minus, Trash2, Play, Pause, Link2, ExternalLink, X, AlignJustify } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { BudgetMeter } from "./BudgetMeter";
@@ -42,10 +42,15 @@ function RatingDots({ rating }: { rating: string }) {
   );
 }
 
+export type FocusSession = { name: string; running: boolean };
+
 interface TimelineProps {
   onTaskSelect: (taskName: string) => void;
   onTaskStart: (taskName: string) => void;
   onCollapse: () => void;
+  session: FocusSession | null;
+  onPauseSession: () => void;
+  onResumeSession: () => void;
 }
 
 type TaskGroup = {
@@ -127,7 +132,7 @@ function groupByName(tasks: Task[]): TaskGroup[] {
   });
 }
 
-export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProps) {
+export function Timeline({ onTaskSelect, onTaskStart, onCollapse, session, onPauseSession, onResumeSession }: TimelineProps) {
   const [newTaskName, setNewTaskName] = useState("");
   const [blockCount, setBlockCount] = useState<number>(1);
 
@@ -419,7 +424,7 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
         <div className="flex flex-col gap-10">
           {/* Open tasks — float above all date dividers, newest first */}
           {openGroups.length > 0 && (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-2">
               {openGroups.map((group) => (
                 <TimelineGroup
                   key={group.blocks[0].id}
@@ -433,6 +438,9 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
                   onSelect={onTaskSelect}
                   onAddBlock={handleAddBlock}
                   onRemoveBlock={handleRemoveBlock}
+                  session={session}
+                  onPauseSession={onPauseSession}
+                  onResumeSession={onResumeSession}
                 />
               ))}
             </div>
@@ -452,7 +460,7 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
               </div>
 
               {section.groups.length > 0 && (
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-2">
                   {section.groups.map((group) => (
                     <TimelineGroup
                       key={group.blocks[0].id}
@@ -466,6 +474,9 @@ export function Timeline({ onTaskSelect, onTaskStart, onCollapse }: TimelineProp
                       onSelect={onTaskSelect}
                       onAddBlock={handleAddBlock}
                       onRemoveBlock={handleRemoveBlock}
+                      session={session}
+                      onPauseSession={onPauseSession}
+                      onResumeSession={onResumeSession}
                     />
                   ))}
                 </div>
@@ -495,30 +506,56 @@ interface TimelineGroupProps {
   onSelect: (name: string) => void;
   onAddBlock: (group: TaskGroup) => void;
   onRemoveBlock: (group: TaskGroup) => void;
+  session: FocusSession | null;
+  onPauseSession: () => void;
+  onResumeSession: () => void;
 }
 
-function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMeta, onRename, onDelete, onSelect, onAddBlock, onRemoveBlock }: TimelineGroupProps) {
+function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMeta, onRename, onDelete, onSelect, onAddBlock, onRemoveBlock, session, onPauseSession, onResumeSession }: TimelineGroupProps) {
   const allDone = group.completedCount === group.blocks.length;
   const hasPending = !allDone;
   const overEstimate = group.completedCount > group.totalEstimated;
-
-  const hasNote = Boolean(group.description);
-  const hasLink = Boolean(group.link);
-  const hasMeta = hasNote || hasLink;
+  const rowSession = session && hasPending && session.name === group.name ? session : null;
 
   const [expanded, setExpanded] = useState(false);
   const [draftNote, setDraftNote] = useState(group.description ?? "");
+  // Shown the moment a click-away commits, before the refetch lands.
+  const [savedNote, setSavedNote] = useState(group.description ?? "");
   const [editingLink, setEditingLink] = useState(false);
   const [draftLink, setDraftLink] = useState(group.link ?? "");
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState(group.name);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const noteEditorRef = useRef<HTMLDivElement>(null);
+  const draftNoteRef = useRef(draftNote);
+  const draftLinkRef = useRef(draftLink);
+  const noteCommittedRef = useRef(group.description ?? "");
+  const linkCommittedRef = useRef(group.link ?? "");
+  // The click that commits the note can land on the preview that replaces the
+  // editor. Ignore that one click so the field doesn't pop straight back open.
+  const suppressOpenRef = useRef(false);
+  draftNoteRef.current = draftNote;
+  draftLinkRef.current = draftLink;
+
+  const hasNote = Boolean(savedNote.trim());
+  const hasLink = Boolean(group.link);
+  const hasMeta = hasNote || hasLink;
 
   // Keep local drafts in sync if the group's data changes underneath us.
+  // Skip while there is an uncommitted edit so a refetch can't wipe the field.
   useEffect(() => {
-    setDraftNote(group.description ?? "");
+    const text = group.description ?? "";
+    if (draftNoteRef.current.trim() !== noteCommittedRef.current) return;
+    noteCommittedRef.current = text;
+    draftNoteRef.current = text;
+    setDraftNote(text);
+    setSavedNote(text);
   }, [group.description]);
   useEffect(() => {
-    setDraftLink(group.link ?? "");
+    const text = group.link ?? "";
+    linkCommittedRef.current = text;
+    draftLinkRef.current = text;
+    setDraftLink(text);
   }, [group.link]);
   useEffect(() => {
     setDraftTitle(group.name);
@@ -553,21 +590,78 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
   };
 
   const saveNote = () => {
-    const next = draftNote.trim();
-    if (next !== (group.description ?? "")) {
-      onUpdateMeta(group, { description: next });
-    }
+    const field = noteEditorRef.current?.querySelector("textarea");
+    const next = (field?.value ?? draftNoteRef.current).trim();
+    draftNoteRef.current = next;
+    setDraftNote(next);
+    setSavedNote(next);
+    if (next === noteCommittedRef.current) return;
+    noteCommittedRef.current = next;
+    onUpdateMeta(group, { description: next });
   };
 
   const saveLink = () => {
-    const next = draftLink.trim() ? normalizeUrl(draftLink) : "";
+    const next = draftLinkRef.current.trim() ? normalizeUrl(draftLinkRef.current) : "";
     setEditingLink(false);
-    if (next !== (group.link ?? "")) {
-      onUpdateMeta(group, { link: next });
+    if (next === linkCommittedRef.current) return;
+    linkCommittedRef.current = next;
+    onUpdateMeta(group, { link: next });
+  };
+
+  const saveNoteRef = useRef(saveNote);
+  const saveLinkRef = useRef(saveLink);
+  saveNoteRef.current = saveNote;
+  saveLinkRef.current = saveLink;
+
+  // Blur doesn't fire when the click lands on a non-focusable part of the page,
+  // so commit the note as soon as the pointer leaves the editor.
+  useEffect(() => {
+    if (!expanded) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      // Clicks on this row belong to the row. Clicks anywhere else commit and close.
+      if (rowRef.current?.contains(target)) return;
+      const root = noteEditorRef.current;
+      if (root && root.contains(target)) return;
+      saveNoteRef.current();
+      saveLinkRef.current();
+      const el = target instanceof Element ? target : target.parentElement;
+      // The note button handles its own toggle. Anywhere else commits and closes.
+      if (el?.closest("[data-note-toggle]")) return;
+      suppressOpenRef.current = true;
+      setExpanded(false);
+      setTimeout(() => {
+        suppressOpenRef.current = false;
+      }, 0);
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [expanded]);
+
+  const toggleNote = () => {
+    if (suppressOpenRef.current) return;
+    if (expanded) {
+      saveNote();
+      saveLink();
     }
+    setExpanded((open) => !open);
+  };
+
+  const handleRowClick = (event: React.MouseEvent) => {
+    if (editingTitle) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("[data-no-play]")) return;
+    // A second click on the title renames. The first click still opens the note.
+    if (event.detail > 1) {
+      if (target.closest("[data-task-title]")) beginEditTitle();
+      return;
+    }
+    toggleNote();
   };
 
   const removeLink = () => {
+    draftLinkRef.current = "";
+    linkCommittedRef.current = "";
     setDraftLink("");
     setEditingLink(false);
     onUpdateMeta(group, { link: "" });
@@ -579,11 +673,19 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
     .sort((a, b) => new Date(a.completedAt!).getTime() - new Date(b.completedAt!).getTime());
 
   return (
-    <div className={`group rounded-lg px-3 py-3 transition-colors hover:bg-muted/30 ${allDone ? "opacity-70" : ""}`}>
+    <div
+      ref={rowRef}
+      className={cn(
+        "group cursor-pointer rounded-lg bg-card/70 px-3 py-3 transition-colors hover:bg-card",
+        allDone && "opacity-70",
+        rowSession && "bg-primary/5 hover:bg-primary/10",
+      )}
+      onClick={handleRowClick}
+    >
       <div className="flex items-start gap-3">
         {/* Block dots with − / + stepper — only when there's something still to do */}
         {hasPending && (
-          <div className="flex items-center gap-1 flex-shrink-0 mt-1">
+          <div data-no-play className="flex items-center gap-1 flex-shrink-0 mt-1.5">
             {group.blocks.length > 1 ? (
               <button
                 type="button"
@@ -622,58 +724,54 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
         )}
 
         {allDone && (
-          <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 mt-1">
             <span className="text-primary text-[10px] font-bold">✓</span>
           </div>
         )}
 
         <div className="flex-1 min-w-0">
-          {editingTitle ? (
-            <Input
-              autoFocus
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-              onBlur={commitTitle}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                } else if (e.key === "Escape") {
-                  e.preventDefault();
-                  cancelTitle();
-                }
-              }}
-              className="h-7 px-2 py-0 text-sm font-medium"
-            />
-          ) : (
-            <span
-              className={`font-medium truncate block cursor-text ${allDone ? "text-muted-foreground" : "text-foreground"}`}
-              onClick={beginEditTitle}
-            >
-              {group.name}
-            </span>
-          )}
-
-          {/* Meta line: counts + plays on left, hover actions on right */}
-          <div className="mt-0.5 flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground font-mono flex items-center gap-2">
-              <span>
-                {group.completedCount} / {group.totalEstimated} blocks
-                {overEstimate && (
-                  <span className="ml-1 text-amber-500">+{group.completedCount - group.totalEstimated} over</span>
+          <div className="flex items-center justify-between gap-2 min-h-7">
+            {editingTitle ? (
+              <Input
+                data-no-play
+                autoFocus
+                value={draftTitle}
+                onChange={(e) => setDraftTitle(e.target.value)}
+                onBlur={commitTitle}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    cancelTitle();
+                  }
+                }}
+                className="h-7 flex-1 px-2 py-0 text-sm font-medium"
+              />
+            ) : (
+              <span
+                data-task-title
+                className={cn(
+                  "min-w-0 font-medium truncate",
+                  allDone ? "text-muted-foreground" : rowSession ? "text-primary" : "text-foreground",
                 )}
+              >
+                {group.name}
               </span>
-            </span>
+            )}
 
             <div
+              data-no-play
               className={`flex items-center gap-0.5 flex-shrink-0 transition-opacity ${
-                expanded ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                expanded || rowSession ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
               }`}
             >
               <button
                 type="button"
+                data-note-toggle
                 title={expanded ? "Hide note" : "Note"}
-                onClick={() => setExpanded((v) => !v)}
+                onClick={toggleNote}
                 className={`w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-primary/10 transition-colors ${
                   expanded ? "text-primary" : "text-muted-foreground hover:text-primary"
                 }`}
@@ -683,11 +781,29 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               {hasPending && (
                 <button
                   type="button"
-                  title="Start focus block"
-                  onClick={() => onPlay(group)}
-                  className="w-7 h-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  title={
+                    rowSession?.running
+                      ? "Pause focus block"
+                      : rowSession
+                        ? "Resume focus block"
+                        : session
+                          ? "Switch focus block"
+                          : "Start focus block"
+                  }
+                  onClick={() => {
+                    if (rowSession?.running) onPauseSession();
+                    else if (rowSession) onResumeSession();
+                    else onPlay(group);
+                  }}
+                  className={`w-7 h-7 inline-flex items-center justify-center rounded-md transition-colors hover:bg-primary/10 ${
+                    rowSession?.running ? "text-primary" : "text-muted-foreground hover:text-primary"
+                  }`}
                 >
-                  <Play className="w-3.5 h-3.5 fill-current" />
+                  {rowSession?.running ? (
+                    <Pause className="w-3.5 h-3.5" />
+                  ) : (
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                  )}
                 </button>
               )}
               <button
@@ -700,6 +816,15 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               </button>
             </div>
           </div>
+
+          <div className="mt-0.5">
+            <span className="text-xs text-muted-foreground font-mono">
+              {group.completedCount} / {group.totalEstimated} blocks
+              {overEstimate && (
+                <span className="ml-1 text-amber-500">+{group.completedCount - group.totalEstimated} over</span>
+              )}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -707,13 +832,14 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
       {hasMeta && !expanded && (
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          data-no-play
+          onClick={toggleNote}
           className={`mt-1.5 flex items-center gap-2 text-left text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors w-full ${
             hasPending ? "pl-[2.1rem]" : "pl-8"
           }`}
         >
           {hasNote ? (
-            <span className="truncate">{group.description}</span>
+            <span className="truncate">{savedNote}</span>
           ) : (
             <span className="flex items-center gap-1.5 truncate text-primary/70">
               <Link2 className="w-3 h-3 flex-shrink-0" />
@@ -725,10 +851,17 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
 
       {/* Expanded note + link editor */}
       {expanded && (
-        <div className={`mt-2 space-y-2.5 ${hasPending ? "pl-[2.1rem]" : "pl-8"} pr-1`}>
+        <div
+          ref={noteEditorRef}
+          data-no-play
+          className={`mt-2 space-y-2.5 ${hasPending ? "pl-[2.1rem]" : "pl-8"} pr-1`}
+        >
           <Textarea
             value={draftNote}
-            onChange={(e) => setDraftNote(e.target.value)}
+            onChange={(e) => {
+              draftNoteRef.current = e.target.value;
+              setDraftNote(e.target.value);
+            }}
             onBlur={saveNote}
             placeholder="Add a note or plan for this task…"
             rows={3}
@@ -786,7 +919,10 @@ function TimelineGroup({ group, onToggleBlock, onPlay, onCompleteAll, onUpdateMe
               <Input
                 autoFocus={editingLink}
                 value={draftLink}
-                onChange={(e) => setDraftLink(e.target.value)}
+                onChange={(e) => {
+                  draftLinkRef.current = e.target.value;
+                  setDraftLink(e.target.value);
+                }}
                 onBlur={saveLink}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {

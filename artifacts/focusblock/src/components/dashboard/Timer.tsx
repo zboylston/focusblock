@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, RotateCcw, Plus, ExternalLink, CornerDownRight, Maximize2, Minimize2 } from "lucide-react";
+import { Play, Pause, RotateCcw, Plus, ExternalLink, CornerDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,6 +35,10 @@ interface TimerProps {
   /** Whether the timer card is widened into scratchpad mode. */
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
+  /** The in-progress focus block, if one has been started and not finished or reset. */
+  onSessionChange: (session: { name: string; running: boolean } | null) => void;
+  /** Pause or resume from the task row. Does not restart the 30 minutes. */
+  sessionControl: { id: number; action: "pause" | "resume" } | null;
 }
 
 export function Timer({
@@ -43,10 +47,14 @@ export function Timer({
   startToken,
   expanded,
   onExpandedChange,
+  onSessionChange,
+  sessionControl,
 }: TimerProps) {
   const [mode, setMode] = useState<TimerMode>("focus");
   const [timeLeft, setTimeLeft] = useState(FOCUS_SECONDS);
   const [isActive, setIsActive] = useState(false);
+  // True after a focus block has started, until it finishes, resets, or leaves focus mode.
+  const [engaged, setEngaged] = useState(false);
   const [completedTaskId, setCompletedTaskId] = useState<number | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [breakDone, setBreakDone] = useState(false);
@@ -71,6 +79,9 @@ export function Timer({
   // The active task's note (the same task-group `description` shown in the
   // timeline). The Timer only knows the name, so look the note up by name.
   const [noteDraft, setNoteDraft] = useState("");
+  // Mirrors noteDraft synchronously so a click-away save doesn't read a stale
+  // state value from the render before the last keystroke.
+  const noteDraftRef = useRef("");
   // Last value loaded from / saved to the server, to skip no-op saves.
   const loadedNoteRef = useRef("");
   // True while the textarea is focused, so a background refetch (e.g. on window
@@ -178,6 +189,7 @@ export function Timer({
     if (isEditingNoteRef.current) return;
     const text = noteData.description ?? "";
     loadedNoteRef.current = text;
+    noteDraftRef.current = text;
     setNoteDraft(text);
   }, [noteData]);
 
@@ -185,6 +197,7 @@ export function Timer({
   useEffect(() => {
     if (noteName.length === 0) {
       loadedNoteRef.current = "";
+      noteDraftRef.current = "";
       setNoteDraft("");
     }
   }, [noteName]);
@@ -202,10 +215,11 @@ export function Timer({
   const saveNote = useCallback(async () => {
     const name = activeTaskName.trim();
     if (!name) return;
-    if (noteDraft.trim() === loadedNoteRef.current.trim()) return;
+    const draft = noteDraftRef.current;
+    if (draft.trim() === loadedNoteRef.current.trim()) return;
     try {
       const result = await updateTaskNote.mutateAsync({
-        data: { name, description: noteDraft },
+        data: { name, description: draft },
       });
       loadedNoteRef.current = result.description ?? "";
       queryClient.invalidateQueries({ queryKey: getGetTaskNoteQueryKey({ name }) });
@@ -219,7 +233,7 @@ export function Timer({
         variant: "destructive",
       });
     }
-  }, [activeTaskName, noteDraft, updateTaskNote, queryClient, toast]);
+  }, [activeTaskName, updateTaskNote, queryClient, toast]);
 
   // Debounced autosave so a long scratchpad session isn't lost if you never
   // blur. Only runs while actively editing; saveNote no-ops if nothing changed.
@@ -284,6 +298,7 @@ export function Timer({
     startTitleFlash();
 
     if (mode === "focus") {
+      setEngaged(false);
       try {
         const task = await completeFocus.mutateAsync({
           data: { name: activeTaskName.trim() || "Deep work" },
@@ -361,10 +376,39 @@ export function Timer({
     endTimeRef.current = Date.now() + FOCUS_SECONDS * 1000;
     primeAudio();
     requestNotificationPermission();
+    setEngaged(true);
     setIsActive(true);
     setRunId((n) => n + 1);
     onExpandedChange(true);
   }, [startToken, stopTitleFlash, onExpandedChange]);
+
+  const handledControl = useRef<number | null>(null);
+  useEffect(() => {
+    if (!sessionControl || sessionControl.id === handledControl.current) return;
+    handledControl.current = sessionControl.id;
+    stopAlertTone();
+    if (sessionControl.action === "pause") {
+      if (!isActive) return;
+      endTimeRef.current = null;
+      setIsActive(false);
+      return;
+    }
+    if (isActive || mode !== "focus") return;
+    primeAudio();
+    requestNotificationPermission();
+    setEngaged(true);
+    onExpandedChange(true);
+    setIsActive(true);
+  }, [sessionControl, isActive, mode, onExpandedChange]);
+
+  useEffect(() => {
+    const name = activeTaskName.trim();
+    if (!engaged || mode !== "focus" || showRatingModal || !name) {
+      onSessionChange(null);
+      return;
+    }
+    onSessionChange({ name, running: isActive });
+  }, [engaged, mode, showRatingModal, activeTaskName, isActive, onSessionChange]);
 
   const toggleTimer = () => {
     stopAlertTone();
@@ -380,7 +424,10 @@ export function Timer({
       // backgrounded when the timer finishes.
       requestNotificationPermission();
       // Starting a focus session opens the scratchpad.
-      if (mode === "focus") onExpandedChange(true);
+      if (mode === "focus") {
+        setEngaged(true);
+        onExpandedChange(true);
+      }
     }
     setIsActive((prev) => !prev);
   };
@@ -388,6 +435,7 @@ export function Timer({
   const resetTimer = () => {
     stopAlertTone();
     setIsActive(false);
+    setEngaged(false);
     endTimeRef.current = null;
     setBreakDone(false);
     setTimeLeft(mode === "focus" ? FOCUS_SECONDS : BREAK_SECONDS);
@@ -397,6 +445,7 @@ export function Timer({
   const switchMode = (next: TimerMode) => {
     stopAlertTone();
     setIsActive(false);
+    setEngaged(false);
     endTimeRef.current = null;
     setBreakDone(false);
     setMode(next);
@@ -418,6 +467,7 @@ export function Timer({
     setBreakDone(false);
     // Clear the focus label so the finished task's title doesn't linger.
     onTaskNameChange("");
+    setEngaged(false);
     setMode("break");
     setTimeLeft(BREAK_SECONDS);
     endTimeRef.current = null;
@@ -435,6 +485,7 @@ export function Timer({
     await addExtraBlock(activeTaskName);
     setMode("focus");
     setTimeLeft(FOCUS_SECONDS);
+    setEngaged(false);
     setIsActive(false);
     endTimeRef.current = null;
     onExpandedChange(true);
@@ -468,28 +519,13 @@ export function Timer({
       <div ref={cardRef}>
       <Card className="border-border/60 shadow-sm overflow-hidden bg-card">
         <CardContent
-          className="p-8 flex flex-col items-center justify-center relative cursor-default"
+          className="p-8 flex flex-col items-center justify-center cursor-default"
           onClick={(e) => {
             if (e.target === e.currentTarget && mode === "focus" && trimmedName) {
               onExpandedChange(!expanded);
             }
           }}
         >
-          {mode === "focus" && trimmedName && (
-            <button
-              type="button"
-              onClick={() => onExpandedChange(!expanded)}
-              title={expanded ? "Collapse scratchpad" : "Expand scratchpad"}
-              aria-label={expanded ? "Collapse scratchpad" : "Expand scratchpad"}
-              className="absolute top-3 right-3 text-muted-foreground/40 hover:text-foreground transition-colors focus:outline-none"
-            >
-              {expanded ? (
-                <Minimize2 className="w-4 h-4" />
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
-            </button>
-          )}
           <div className="flex gap-2 bg-muted/50 p-1 rounded-full mb-8">
             <button
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${mode === "focus" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
@@ -505,10 +541,10 @@ export function Timer({
             </button>
           </div>
 
-          <div className="w-full max-w-xs mb-8">
+          <div className="w-full max-w-md mb-3">
             {mode === "focus" ? (
               isActive ? (
-                <div className="text-center text-xl font-bold text-primary min-h-12 flex items-center justify-center flex-wrap px-1 py-1 leading-snug">
+                <div className="text-center text-3xl font-medium tracking-tight text-foreground min-h-12 flex items-center justify-center flex-wrap px-1 py-1 leading-snug">
                   {activeTaskName || "Deep work"}
                 </div>
               ) : (
@@ -519,18 +555,18 @@ export function Timer({
                   onFocus={() => {
                     if (trimmedName) onExpandedChange(true);
                   }}
-                  className="text-center bg-transparent border-t-0 border-x-0 border-b-2 border-border/50 focus-visible:border-primary focus-visible:ring-0 rounded-none px-0 text-base text-foreground placeholder:text-muted-foreground/50 h-12"
+                  className="h-auto text-center bg-transparent border-0 border-b border-border/30 shadow-none rounded-none px-0 py-1 text-3xl md:text-3xl font-medium tracking-tight text-foreground placeholder:text-xl placeholder:font-normal placeholder:text-muted-foreground/40 focus-visible:border-primary/40 focus-visible:ring-0"
                 />
               )
             ) : (
-              <div className="text-center text-lg text-muted-foreground h-12 flex items-center justify-center">
+              <div className="text-center text-3xl font-medium tracking-tight text-muted-foreground min-h-12 flex items-center justify-center">
                 Take a breather
               </div>
             )}
           </div>
 
           {mode === "focus" && hasGroup && group && (
-            <div className="w-full max-w-xs -mt-5 mb-8 flex items-center justify-center gap-1.5">
+            <div className="w-full max-w-md mb-8 flex items-center justify-center gap-1.5">
               <CornerDownRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/40" />
               <input
                 value={subtaskDraft}
@@ -676,7 +712,10 @@ export function Timer({
               </div>
               <MarkdownEditor
                 value={noteDraft}
-                onChange={setNoteDraft}
+                onChange={(value) => {
+                  noteDraftRef.current = value;
+                  setNoteDraft(value);
+                }}
                 onFocus={() => {
                   isEditingNoteRef.current = true;
                   onExpandedChange(true);

@@ -1,14 +1,31 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Timer, Timeline, Header } from "@/components/dashboard";
+
+export type FocusSession = { name: string; running: boolean };
+export type SessionControl = { id: number; action: "pause" | "resume" };
 
 export default function Home() {
   const [activeTaskName, setActiveTaskName] = useState("");
   const [startToken, setStartToken] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  const [session, setSession] = useState<FocusSession | null>(null);
+  const [sessionControl, setSessionControl] = useState<SessionControl | null>(null);
 
   const handleTaskStart = (name: string) => {
     setActiveTaskName(name);
     setStartToken((t) => t + 1);
+  };
+
+  const handleSessionChange = useCallback((next: FocusSession | null) => {
+    setSession((prev) => {
+      if (prev === null && next === null) return prev;
+      if (prev && next && prev.name === next.name && prev.running === next.running) return prev;
+      return next;
+    });
+  }, []);
+
+  const controlSession = (action: SessionControl["action"]) => {
+    setSessionControl({ id: Date.now(), action });
   };
 
   return (
@@ -27,11 +44,20 @@ export default function Home() {
               startToken={startToken}
               expanded={expanded}
               onExpandedChange={setExpanded}
+              onSessionChange={handleSessionChange}
+              sessionControl={sessionControl}
             />
           </div>
         </div>
         <div className="w-full flex-1 min-w-0">
-          <Timeline onTaskSelect={setActiveTaskName} onTaskStart={handleTaskStart} onCollapse={() => setExpanded(false)} />
+          <Timeline
+            onTaskSelect={setActiveTaskName}
+            onTaskStart={handleTaskStart}
+            onCollapse={() => setExpanded(false)}
+            session={session}
+            onPauseSession={() => controlSession("pause")}
+            onResumeSession={() => controlSession("resume")}
+          />
         </div>
       </main>
     </div>

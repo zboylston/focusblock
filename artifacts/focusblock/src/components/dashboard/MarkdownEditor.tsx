@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TaskList from "@tiptap/extension-task-list";
@@ -34,6 +34,15 @@ export function MarkdownEditor({
   placeholder,
   className,
 }: MarkdownEditorProps) {
+  // useEditor reads these once. Keep refs so blur/change see the latest parent
+  // callbacks — otherwise clicking away saves the note from the first render.
+  const onChangeRef = useRef(onChange);
+  const onFocusRef = useRef(onFocus);
+  const onBlurRef = useRef(onBlur);
+  onChangeRef.current = onChange;
+  onFocusRef.current = onFocus;
+  onBlurRef.current = onBlur;
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -58,11 +67,27 @@ export function MarkdownEditor({
       },
     },
     onUpdate: ({ editor }) => {
-      onChange(editor.storage.markdown.getMarkdown());
+      onChangeRef.current(editor.storage.markdown.getMarkdown());
     },
-    onFocus: () => onFocus?.(),
-    onBlur: () => onBlur?.(),
+    onFocus: () => onFocusRef.current?.(),
+    onBlur: () => onBlurRef.current?.(),
   });
+
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Clicking a non-focusable part of the page doesn't always blur the editor.
+  // Save as soon as the pointer goes outside the field.
+  useEffect(() => {
+    if (!editor) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const root = wrapRef.current;
+      if (!root || root.contains(event.target as Node)) return;
+      if (!editor.isFocused) return;
+      editor.commands.blur();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [editor]);
 
   // Sync external value changes (server load / task switch) into the editor,
   // but never while the user is actively editing — that would clobber typing.
@@ -75,6 +100,7 @@ export function MarkdownEditor({
 
   return (
     <div
+      ref={wrapRef}
       className={cn("md-scratchpad cursor-text", className)}
       onClick={() => {
         if (editor && !editor.isFocused) editor.commands.focus();
