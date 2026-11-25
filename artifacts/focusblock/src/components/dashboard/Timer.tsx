@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { playAlertTone, stopAlertTone, primeAudio } from "@/lib/audio";
 import { requestNotificationPermission, showNotification } from "@/lib/notifications";
-import { linkHost, normalizeUrl } from "@/lib/url";
+import { linkHost, normalizeUrl, parseStoredLinks } from "@/lib/url";
 import {
   useCompleteFocus,
   useGetTaskNote,
@@ -18,6 +18,7 @@ import {
   getGetTaskNoteQueryKey,
   getGetTaskGroupQueryKey,
   getGetTodayStatsQueryKey,
+  getGetOpenTasksQueryKey,
   type Task,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -39,6 +40,8 @@ interface TimerProps {
   onSessionChange: (session: { name: string; running: boolean } | null) => void;
   /** Pause or resume from the task row. Does not restart the 30 minutes. */
   sessionControl: { id: number; action: "pause" | "resume" } | null;
+  /** A focus block just started (not a resume). Puts that task in Now. */
+  onFocusStart?: (name: string) => void;
 }
 
 export function Timer({
@@ -49,6 +52,7 @@ export function Timer({
   onExpandedChange,
   onSessionChange,
   sessionControl,
+  onFocusStart,
 }: TimerProps) {
   const [mode, setMode] = useState<TimerMode>("focus");
   const [timeLeft, setTimeLeft] = useState(FOCUS_SECONDS);
@@ -134,6 +138,7 @@ export function Timer({
     (name: string) => {
       queryClient.invalidateQueries({ queryKey: ["timeline"] });
       queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetOpenTasksQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetTaskGroupQueryKey({ name }) });
     },
     [queryClient],
@@ -380,7 +385,9 @@ export function Timer({
     setIsActive(true);
     setRunId((n) => n + 1);
     onExpandedChange(true);
-  }, [startToken, stopTitleFlash, onExpandedChange]);
+    const startedName = activeTaskName.trim();
+    if (startedName) onFocusStart?.(startedName);
+  }, [startToken, stopTitleFlash, onExpandedChange, activeTaskName, onFocusStart]);
 
   const handledControl = useRef<number | null>(null);
   useEffect(() => {
@@ -413,6 +420,7 @@ export function Timer({
   const toggleTimer = () => {
     stopAlertTone();
     if (!isActive && mode === "focus" && !activeTaskName.trim()) return;
+    const startingFocus = !isActive && mode === "focus";
     if (isActive) {
       // Pausing: freeze the remaining time by dropping the target timestamp.
       endTimeRef.current = null;
@@ -429,6 +437,7 @@ export function Timer({
         onExpandedChange(true);
       }
     }
+    if (startingFocus) onFocusStart?.(activeTaskName.trim());
     setIsActive((prev) => !prev);
   };
 
@@ -673,15 +682,16 @@ export function Timer({
                 </span>
               </div>
 
-              {group.link && (
+              {(group.links?.length ? group.links : parseStoredLinks(group.link)).map((url) => (
                 <a
-                  href={normalizeUrl(group.link)}
+                  key={url}
+                  href={normalizeUrl(url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-lg border border-border/60 bg-card px-2.5 py-1.5 hover:border-primary/40 transition-colors group/link"
                 >
                   <img
-                    src={`https://icons.duckduckgo.com/ip3/${linkHost(group.link)}.ico`}
+                    src={`https://icons.duckduckgo.com/ip3/${linkHost(url)}.ico`}
                     alt=""
                     className="w-4 h-4 rounded-sm flex-shrink-0"
                     onError={(e) => {
@@ -689,11 +699,11 @@ export function Timer({
                     }}
                   />
                   <span className="text-xs font-medium text-foreground truncate flex-1">
-                    {linkHost(group.link)}
+                    {linkHost(url)}
                   </span>
                   <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />
                 </a>
-              )}
+              ))}
 
             </div>
           )}

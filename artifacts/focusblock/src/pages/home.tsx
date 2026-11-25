@@ -1,4 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useFocusTask, getGetOpenTasksQueryKey, getGetTodayStatsQueryKey } from "@workspace/api-client-react";
 import { Timer, Timeline, Header } from "@/components/dashboard";
 
 export type FocusSession = { name: string; running: boolean };
@@ -10,11 +12,54 @@ export default function Home() {
   const [expanded, setExpanded] = useState(false);
   const [session, setSession] = useState<FocusSession | null>(null);
   const [sessionControl, setSessionControl] = useState<SessionControl | null>(null);
+  const [nowName, setNowName] = useState<string | null>(null);
+  const pendingFocus = useRef<{ name: string; date: string } | null>(null);
+  const seededFor = useRef<string | null>(null);
+  const nowNameRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
+  const focusTask = useFocusTask();
 
-  const handleTaskStart = (name: string) => {
+  const handleTaskStart = (name: string, date: string) => {
+    pendingFocus.current = { name, date };
     setActiveTaskName(name);
     setStartToken((t) => t + 1);
   };
+
+  const handleNowChange = useCallback((name: string | null) => {
+    setNowName(name);
+  }, []);
+
+  const handleFocusStart = useCallback(
+    (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const pending = pendingFocus.current;
+      pendingFocus.current = null;
+      const date = pending && pending.name === trimmed ? pending.date : undefined;
+      focusTask.mutate(
+        { data: { name: trimmed, ...(date ? { date } : {}) } },
+        {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["timeline"] });
+            queryClient.invalidateQueries({ queryKey: getGetTodayStatsQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getGetOpenTasksQueryKey() });
+          },
+        },
+      );
+    },
+    [focusTask, queryClient],
+  );
+
+  useEffect(() => {
+    const previous = nowNameRef.current;
+    nowNameRef.current = nowName;
+    if (previous && !nowName && !session) {
+      setActiveTaskName((current) => (current === previous ? "" : current));
+    }
+    if (!nowName || seededFor.current === nowName) return;
+    seededFor.current = nowName;
+    setActiveTaskName((current) => (current.trim() ? current : nowName));
+  }, [nowName, session]);
 
   const handleSessionChange = useCallback((next: FocusSession | null) => {
     setSession((prev) => {
@@ -46,6 +91,7 @@ export default function Home() {
               onExpandedChange={setExpanded}
               onSessionChange={handleSessionChange}
               sessionControl={sessionControl}
+              onFocusStart={handleFocusStart}
             />
           </div>
         </div>
@@ -57,6 +103,7 @@ export default function Home() {
             session={session}
             onPauseSession={() => controlSession("pause")}
             onResumeSession={() => controlSession("resume")}
+            onNowChange={handleNowChange}
           />
         </div>
       </main>

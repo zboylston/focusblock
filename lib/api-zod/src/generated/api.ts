@@ -29,7 +29,9 @@ export const createTasksBodyChunksMax = 16;
 export const CreateTasksBody = zod.object({
   "name": zod.string().min(1),
   "chunks": zod.number().min(1).max(createTasksBodyChunksMax),
-  "date": zod.coerce.date().optional()
+  "date": zod.coerce.date().optional(),
+  "description": zod.string().optional().describe('Task-group note \/ plan, stored on the first block'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs, stored on the first block')
 })
 
 
@@ -57,8 +59,11 @@ export const GetTimelineResponse = zod.object({
   "completed": zod.boolean(),
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
-  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "link": zod.string().nullish().describe('First reference URL attached to the task group'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs attached to the task group (stored on the first block)'),
   "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
+  "horizon": zod.enum(['now', 'next', 'later']).describe('Where this task sits in the open sequence. Stored on the first block of the group.'),
+  "position": zod.number().describe('Order within the horizon. Lower comes first. Stored on the first block of the group.'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
@@ -76,7 +81,7 @@ export const GetTimelineResponse = zod.object({
 export const GetTodayStatsResponse = zod.object({
   "totalBlocks": zod.number(),
   "totalMinutes": zod.number(),
-  "openPlannedBlocks": zod.number().describe('Remaining planned focus blocks across all open task groups (any day), clamped per group so over-estimated groups never go negative.')
+  "openPlannedBlocks": zod.number().describe('Remaining planned focus blocks across open Now and Next groups (any day). Later is parked and does not count. Clamped per group so over-estimated groups never go negative.')
 })
 
 
@@ -100,8 +105,11 @@ export const CompleteFocusResponse = zod.object({
   "completed": zod.boolean(),
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
-  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "link": zod.string().nullish().describe('First reference URL attached to the task group'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs attached to the task group (stored on the first block)'),
   "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
+  "horizon": zod.enum(['now', 'next', 'later']).describe('Where this task sits in the open sequence. Stored on the first block of the group.'),
+  "position": zod.number().describe('Order within the horizon. Lower comes first. Stored on the first block of the group.'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
@@ -167,8 +175,11 @@ export const GetTaskGroupResponse = zod.object({
   "completed": zod.boolean(),
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
-  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "link": zod.string().nullish().describe('First reference URL attached to the task group'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs attached to the task group (stored on the first block)'),
   "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
+  "horizon": zod.enum(['now', 'next', 'later']).describe('Where this task sits in the open sequence. Stored on the first block of the group.'),
+  "position": zod.number().describe('Order within the horizon. Lower comes first. Stored on the first block of the group.'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
@@ -177,7 +188,8 @@ export const GetTaskGroupResponse = zod.object({
   "totalEstimated": zod.number().describe('Originally planned block count for the group'),
   "completedCount": zod.number().describe('Number of completed blocks (may exceed totalEstimated when over)'),
   "description": zod.string().nullish().describe('The task-group note \/ plan'),
-  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "link": zod.string().nullish().describe('First reference URL attached to the task group'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs attached to the task group'),
   "subtask": zod.string().nullish().describe('Current sub-focus within the task group')
 })
 
@@ -202,8 +214,11 @@ export const AddBlockResponse = zod.object({
   "completed": zod.boolean(),
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
-  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "link": zod.string().nullish().describe('First reference URL attached to the task group'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs attached to the task group (stored on the first block)'),
   "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
+  "horizon": zod.enum(['now', 'next', 'later']).describe('Where this task sits in the open sequence. Stored on the first block of the group.'),
+  "position": zod.number().describe('Order within the horizon. Lower comes first. Stored on the first block of the group.'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
@@ -235,14 +250,100 @@ export const RenameTaskGroupResponseItem = zod.object({
   "completed": zod.boolean(),
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
-  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "link": zod.string().nullish().describe('First reference URL attached to the task group'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs attached to the task group (stored on the first block)'),
   "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
+  "horizon": zod.enum(['now', 'next', 'later']).describe('Where this task sits in the open sequence. Stored on the first block of the group.'),
+  "position": zod.number().describe('Order within the horizon. Lower comes first. Stored on the first block of the group.'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })
 export const RenameTaskGroupResponse = zod.array(RenameTaskGroupResponseItem)
+
+
+/**
+ * Returns every block of every task group that still has open work, on any day. This is the full Now / Next / Later sequence, independent of timeline pagination.
+ * @summary List every open task
+ */
+export const GetOpenTasksResponse = zod.object({
+  "tasks": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "date": zod.coerce.date(),
+  "chunkIndex": zod.number().describe('1-based index within its block group'),
+  "totalChunks": zod.number(),
+  "completed": zod.boolean(),
+  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
+  "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
+  "link": zod.string().nullish().describe('First reference URL attached to the task group'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs attached to the task group (stored on the first block)'),
+  "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
+  "horizon": zod.enum(['now', 'next', 'later']).describe('Where this task sits in the open sequence. Stored on the first block of the group.'),
+  "position": zod.number().describe('Order within the horizon. Lower comes first. Stored on the first block of the group.'),
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this block'),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * Places an open (name, date) group at `index` in the destination horizon. Index is the position after the group is removed from its current spot. Moving a group to Now demotes the previous Now to the top of Next. Fully completed groups are not part of the sequence.
+ * @summary Move an open task within the sequence
+ */
+
+export const placeTaskBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const placeTaskBodyIndexMin = 0;
+
+
+
+export const PlaceTaskBody = zod.object({
+  "name": zod.string().min(1),
+  "date": zod.string().regex(placeTaskBodyDateRegExp).describe('Calendar day (YYYY-MM-DD) of the group to move'),
+  "horizon": zod.enum(['now', 'next', 'later']),
+  "index": zod.number().min(placeTaskBodyIndexMin).describe('Position in the destination list after the group is removed from its current spot')
+})
+
+export const PlaceTaskResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "date": zod.coerce.date(),
+  "chunkIndex": zod.number().describe('1-based index within its block group'),
+  "totalChunks": zod.number(),
+  "completed": zod.boolean(),
+  "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
+  "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
+  "link": zod.string().nullish().describe('First reference URL attached to the task group'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs attached to the task group (stored on the first block)'),
+  "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
+  "horizon": zod.enum(['now', 'next', 'later']).describe('Where this task sits in the open sequence. Stored on the first block of the group.'),
+  "position": zod.number().describe('Order within the horizon. Lower comes first. Stored on the first block of the group.'),
+  "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
+  "notes": zod.string().nullish().describe('What was worked on during this block'),
+  "completedAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * Puts an open group in Now. The previous Now moves to the top of Next. When `date` is omitted, resolves today's open group for the name, then any other open group. Does nothing when the name has no open group.
+ * @summary Make a task the current Now
+ */
+
+export const focusTaskBodyDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const FocusTaskBody = zod.object({
+  "name": zod.string().min(1),
+  "date": zod.string().regex(focusTaskBodyDateRegExp).optional().describe('Calendar day of the group to focus. Omit to resolve an open group by name.')
+})
+
+export const FocusTaskResponse = zod.object({
+  "placed": zod.boolean().describe('False when the name has no open group to put in Now')
+})
 
 
 /**
@@ -265,6 +366,7 @@ export const UpdateTaskBody = zod.object({
   "notes": zod.string().optional().describe('What was worked on during this block'),
   "description": zod.string().optional().describe('Task-group note \/ plan (empty string clears it)'),
   "link": zod.string().optional().describe('Reference URL for the task group (empty string clears it)'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs for the task group. An empty array clears them.'),
   "subtask": zod.string().optional().describe('Current sub-focus within the task group (empty string clears it)'),
   "plays": zod.number().min(updateTaskBodyPlaysMin).optional(),
   "incrementPlays": zod.number().min(1).optional().describe('Atomically add this many plays to the current value')
@@ -279,8 +381,11 @@ export const UpdateTaskResponse = zod.object({
   "completed": zod.boolean(),
   "plays": zod.number().describe('Number of times the timer was triggered for this task group'),
   "description": zod.string().nullish().describe('Task-group note \/ plan (stored on the first block of the group)'),
-  "link": zod.string().nullish().describe('Reference URL attached to the task group'),
+  "link": zod.string().nullish().describe('First reference URL attached to the task group'),
+  "links": zod.array(zod.string()).optional().describe('Reference URLs attached to the task group (stored on the first block)'),
   "subtask": zod.string().nullish().describe('Current sub-focus within the task group (stored on the first block)'),
+  "horizon": zod.enum(['now', 'next', 'later']).describe('Where this task sits in the open sequence. Stored on the first block of the group.'),
+  "position": zod.number().describe('Order within the horizon. Lower comes first. Stored on the first block of the group.'),
   "rating": zod.string().nullish().describe('Emoji rating: 😩 | 😐 | 🙂 | 🔥'),
   "notes": zod.string().nullish().describe('What was worked on during this block'),
   "completedAt": zod.coerce.date().nullish(),

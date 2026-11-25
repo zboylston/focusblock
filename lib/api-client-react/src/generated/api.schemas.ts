@@ -9,6 +9,18 @@ export interface HealthStatus {
   status: string;
 }
 
+/**
+ * Where this task sits in the open sequence. Stored on the first block of the group.
+ */
+export type TaskHorizon = typeof TaskHorizon[keyof typeof TaskHorizon];
+
+
+export const TaskHorizon = {
+  now: 'now',
+  next: 'next',
+  later: 'later',
+} as const;
+
 export interface Task {
   id: number;
   name: string;
@@ -25,15 +37,21 @@ export interface Task {
      */
   description?: string | null;
   /**
-     * Reference URL attached to the task group
+     * First reference URL attached to the task group
      * @nullable
      */
   link?: string | null;
+  /** Reference URLs attached to the task group (stored on the first block) */
+  links?: string[];
   /**
      * Current sub-focus within the task group (stored on the first block)
      * @nullable
      */
   subtask?: string | null;
+  /** Where this task sits in the open sequence. Stored on the first block of the group. */
+  horizon: TaskHorizon;
+  /** Order within the horizon. Lower comes first. Stored on the first block of the group. */
+  position: number;
   /**
      * Emoji rating: 😩 | 😐 | 🙂 | 🔥
      * @nullable
@@ -58,6 +76,10 @@ export interface TaskInput {
      */
   chunks: number;
   date?: string;
+  /** Task-group note / plan, stored on the first block */
+  description?: string;
+  /** Reference URLs, stored on the first block */
+  links?: string[];
 }
 
 export type TaskUpdateRating = typeof TaskUpdateRating[keyof typeof TaskUpdateRating];
@@ -80,6 +102,8 @@ export interface TaskUpdate {
   description?: string;
   /** Reference URL for the task group (empty string clears it) */
   link?: string;
+  /** Reference URLs for the task group. An empty array clears them. */
+  links?: string[];
   /** Current sub-focus within the task group (empty string clears it) */
   subtask?: string;
   /** @minimum 0 */
@@ -134,10 +158,12 @@ export interface TaskGroupContext {
      */
   description?: string | null;
   /**
-     * Reference URL attached to the task group
+     * First reference URL attached to the task group
      * @nullable
      */
   link?: string | null;
+  /** Reference URLs attached to the task group */
+  links?: string[];
   /**
      * Current sub-focus within the task group
      * @nullable
@@ -168,6 +194,50 @@ export interface RenameTaskGroupInput {
   newName: string;
 }
 
+export interface OpenTasks {
+  tasks: Task[];
+}
+
+export type PlaceTaskInputHorizon = typeof PlaceTaskInputHorizon[keyof typeof PlaceTaskInputHorizon];
+
+
+export const PlaceTaskInputHorizon = {
+  now: 'now',
+  next: 'next',
+  later: 'later',
+} as const;
+
+export interface PlaceTaskInput {
+  /** @minLength 1 */
+  name: string;
+  /**
+     * Calendar day (YYYY-MM-DD) of the group to move
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  date: string;
+  horizon: PlaceTaskInputHorizon;
+  /**
+     * Position in the destination list after the group is removed from its current spot
+     * @minimum 0
+     */
+  index: number;
+}
+
+export interface FocusTaskInput {
+  /** @minLength 1 */
+  name: string;
+  /**
+     * Calendar day of the group to focus. Omit to resolve an open group by name.
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  date?: string;
+}
+
+export interface FocusTaskResult {
+  /** False when the name has no open group to put in Now */
+  placed: boolean;
+}
+
 export interface TimelinePage {
   tasks: Task[];
   /**
@@ -181,7 +251,7 @@ export interface TimelinePage {
 export interface TodayStats {
   totalBlocks: number;
   totalMinutes: number;
-  /** Remaining planned focus blocks across all open task groups (any day), clamped per group so over-estimated groups never go negative. */
+  /** Remaining planned focus blocks across open Now and Next groups (any day). Later is parked and does not count. Clamped per group so over-estimated groups never go negative. */
   openPlannedBlocks: number;
 }
 

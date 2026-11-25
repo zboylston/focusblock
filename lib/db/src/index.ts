@@ -54,9 +54,21 @@ export function ensureTasksTable() {
         "rating" text,
         "notes" text,
         "completed_at" timestamp with time zone,
-        "created_at" timestamp with time zone DEFAULT now() NOT NULL
+        "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+        "horizon" text DEFAULT 'next' NOT NULL,
+        "position" integer DEFAULT 0 NOT NULL
       )
     `)
+    .then(() =>
+      getPool().query(
+        `ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "horizon" text DEFAULT 'next' NOT NULL`,
+      ),
+    )
+    .then(() =>
+      getPool().query(
+        `ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "position" integer DEFAULT 0 NOT NULL`,
+      ),
+    )
     .then(() => undefined);
   return _schemaReady;
 }

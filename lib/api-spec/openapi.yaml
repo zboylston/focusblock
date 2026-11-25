@@ -244,6 +244,72 @@ paths:
         "409":
           description: A group with the new name already exists on that date
 
+  /tasks/open:
+    get:
+      operationId: getOpenTasks
+      tags: [tasks]
+      summary: List every open task
+      description: >-
+        Returns every block of every task group that still has open work, on any
+        day. This is the full Now / Next / Later sequence, independent of timeline
+        pagination.
+      responses:
+        "200":
+          description: All blocks belonging to open groups
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenTasks"
+
+  /tasks/place:
+    post:
+      operationId: placeTask
+      tags: [tasks]
+      summary: Move an open task within the sequence
+      description: >-
+        Places an open (name, date) group at `index` in the destination horizon.
+        Index is the position after the group is removed from its current spot.
+        Moving a group to Now demotes the previous Now to the top of Next.
+        Fully completed groups are not part of the sequence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceTaskInput"
+      responses:
+        "200":
+          description: The group's first block after the move
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: No open group for that name and date
+
+  /tasks/focus:
+    post:
+      operationId: focusTask
+      tags: [tasks]
+      summary: Make a task the current Now
+      description: >-
+        Puts an open group in Now. The previous Now moves to the top of Next.
+        When `date` is omitted, resolves today's open group for the name, then
+        any other open group. Does nothing when the name has no open group.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FocusTaskInput"
+      responses:
+        "200":
+          description: Whether an open group was placed in Now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FocusTaskResult"
+
   /tasks/{id}:
     patch:
       operationId: updateTask
@@ -299,7 +365,7 @@ components:
 
     Task:
       type: object
-      required: [id, name, date, chunkIndex, totalChunks, completed, plays, createdAt]
+      required: [id, name, date, chunkIndex, totalChunks, completed, plays, horizon, position, createdAt]
       properties:
         id:
           type: integer
@@ -323,10 +389,22 @@ components:
           description: "Task-group note / plan (stored on the first block of the group)"
         link:
           type: ["string", "null"]
-          description: "Reference URL attached to the task group"
+          description: "First reference URL attached to the task group"
+        links:
+          type: array
+          items:
+            type: string
+          description: "Reference URLs attached to the task group (stored on the first block)"
         subtask:
           type: ["string", "null"]
           description: "Current sub-focus within the task group (stored on the first block)"
+        horizon:
+          type: string
+          enum: [now, next, later]
+          description: "Where this task sits in the open sequence. Stored on the first block of the group."
+        position:
+          type: integer
+          description: "Order within the horizon. Lower comes first. Stored on the first block of the group."
         rating:
           type: ["string", "null"]
           description: "Emoji rating: 😩 | 😐 | 🙂 | 🔥"
@@ -354,6 +432,14 @@ components:
         date:
           type: string
           format: date
+        description:
+          type: string
+          description: "Task-group note / plan, stored on the first block"
+        links:
+          type: array
+          items:
+            type: string
+          description: "Reference URLs, stored on the first block"
 
     TaskUpdate:
       type: object
@@ -374,6 +460,11 @@ components:
         link:
           type: string
           description: "Reference URL for the task group (empty string clears it)"
+        links:
+          type: array
+          items:
+            type: string
+          description: "Reference URLs for the task group. An empty array clears them."
         subtask:
           type: string
           description: "Current sub-focus within the task group (empty string clears it)"
@@ -440,7 +531,12 @@ components:
           description: The task-group note / plan
         link:
           type: ["string", "null"]
-          description: Reference URL attached to the task group
+          description: First reference URL attached to the task group
+        links:
+          type: array
+          items:
+            type: string
+          description: Reference URLs attached to the task group
         subtask:
           type: ["string", "null"]
           description: Current sub-focus within the task group
@@ -470,6 +566,54 @@ components:
           minLength: 1
           description: New task-group name
 
+    OpenTasks:
+      type: object
+      required: [tasks]
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+
+    PlaceTaskInput:
+      type: object
+      required: [name, date, horizon, index]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Calendar day (YYYY-MM-DD) of the group to move
+        horizon:
+          type: string
+          enum: [now, next, later]
+        index:
+          type: integer
+          minimum: 0
+          description: Position in the destination list after the group is removed from its current spot
+
+    FocusTaskInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        date:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Calendar day of the group to focus. Omit to resolve an open group by name.
+
+    FocusTaskResult:
+      type: object
+      required: [placed]
+      properties:
+        placed:
+          type: boolean
+          description: False when the name has no open group to put in Now
+
     TimelinePage:
       type: object
       required: [tasks, hasMore]
@@ -495,4 +639,4 @@ components:
           type: integer
         openPlannedBlocks:
           type: integer
-          description: Remaining planned focus blocks across all open task groups (any day), clamped per group so over-estimated groups never go negative.
+          description: Remaining planned focus blocks across open Now and Next groups (any day). Later is parked and does not count. Clamped per group so over-estimated groups never go negative.

@@ -15,4 +15,8 @@ export interface TaskInput {
      */
   chunks: number;
   date?: Date;
+  /** Task-group note / plan, stored on the first block */
+  description?: string;
+  /** Reference URLs, stored on the first block */
+  links?: string[];
 }

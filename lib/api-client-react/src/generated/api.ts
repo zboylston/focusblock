@@ -22,10 +22,14 @@ import type {
 import type {
   AddBlockInput,
   CompleteFocusInput,
+  FocusTaskInput,
+  FocusTaskResult,
   GetTaskGroupParams,
   GetTaskNoteParams,
   GetTimelineParams,
   HealthStatus,
+  OpenTasks,
+  PlaceTaskInput,
   RenameTaskGroupInput,
   Task,
   TaskGroupContext,
@@ -818,6 +822,228 @@ export const useRenameTaskGroup = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getRenameTaskGroupMutationOptions(options));
+    }
+
+export const getGetOpenTasksUrl = () => {
+
+
+
+
+  return `/api/tasks/open`
+}
+
+/**
+ * Returns every block of every task group that still has open work, on any day. This is the full Now / Next / Later sequence, independent of timeline pagination.
+ * @summary List every open task
+ */
+export const getOpenTasks = async ( options?: RequestInit): Promise<OpenTasks> => {
+
+  return customFetch<OpenTasks>(getGetOpenTasksUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOpenTasksQueryKey = () => {
+    return [
+    `/api/tasks/open`
+    ] as const;
+    }
+
+
+export const getGetOpenTasksQueryOptions = <TData = Awaited<ReturnType<typeof getOpenTasks>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOpenTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOpenTasksQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOpenTasks>>> = ({ signal }) => getOpenTasks({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOpenTasks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOpenTasksQueryResult = NonNullable<Awaited<ReturnType<typeof getOpenTasks>>>
+export type GetOpenTasksQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List every open task
+ */
+
+export function useGetOpenTasks<TData = Awaited<ReturnType<typeof getOpenTasks>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOpenTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOpenTasksQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPlaceTaskUrl = () => {
+
+
+
+
+  return `/api/tasks/place`
+}
+
+/**
+ * Places an open (name, date) group at `index` in the destination horizon. Index is the position after the group is removed from its current spot. Moving a group to Now demotes the previous Now to the top of Next. Fully completed groups are not part of the sequence.
+ * @summary Move an open task within the sequence
+ */
+export const placeTask = async (placeTaskInput: PlaceTaskInput, options?: RequestInit): Promise<Task> => {
+
+  return customFetch<Task>(getPlaceTaskUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      placeTaskInput,)
+  }
+);}
+
+
+
+
+export const getPlaceTaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof placeTask>>, TError,{data: BodyType<PlaceTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof placeTask>>, TError,{data: BodyType<PlaceTaskInput>}, TContext> => {
+
+const mutationKey = ['placeTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof placeTask>>, {data: BodyType<PlaceTaskInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  placeTask(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PlaceTaskMutationResult = NonNullable<Awaited<ReturnType<typeof placeTask>>>
+    export type PlaceTaskMutationBody = BodyType<PlaceTaskInput>
+    export type PlaceTaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Move an open task within the sequence
+ */
+export const usePlaceTask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof placeTask>>, TError,{data: BodyType<PlaceTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof placeTask>>,
+        TError,
+        {data: BodyType<PlaceTaskInput>},
+        TContext
+      > => {
+      return useMutation(getPlaceTaskMutationOptions(options));
+    }
+
+export const getFocusTaskUrl = () => {
+
+
+
+
+  return `/api/tasks/focus`
+}
+
+/**
+ * Puts an open group in Now. The previous Now moves to the top of Next. When `date` is omitted, resolves today's open group for the name, then any other open group. Does nothing when the name has no open group.
+ * @summary Make a task the current Now
+ */
+export const focusTask = async (focusTaskInput: FocusTaskInput, options?: RequestInit): Promise<FocusTaskResult> => {
+
+  return customFetch<FocusTaskResult>(getFocusTaskUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      focusTaskInput,)
+  }
+);}
+
+
+
+
+export const getFocusTaskMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof focusTask>>, TError,{data: BodyType<FocusTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof focusTask>>, TError,{data: BodyType<FocusTaskInput>}, TContext> => {
+
+const mutationKey = ['focusTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof focusTask>>, {data: BodyType<FocusTaskInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  focusTask(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FocusTaskMutationResult = NonNullable<Awaited<ReturnType<typeof focusTask>>>
+    export type FocusTaskMutationBody = BodyType<FocusTaskInput>
+    export type FocusTaskMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Make a task the current Now
+ */
+export const useFocusTask = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof focusTask>>, TError,{data: BodyType<FocusTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof focusTask>>,
+        TError,
+        {data: BodyType<FocusTaskInput>},
+        TContext
+      > => {
+      return useMutation(getFocusTaskMutationOptions(options));
     }
 
 export const getUpdateTaskUrl = (id: number,) => {

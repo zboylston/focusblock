@@ -25,10 +25,12 @@ export interface TaskGroupContext {
      */
   description?: string | null;
   /**
-     * Reference URL attached to the task group
+     * First reference URL attached to the task group
      * @nullable
      */
   link?: string | null;
+  /** Reference URLs attached to the task group */
+  links?: string[];
   /**
      * Current sub-focus within the task group
      * @nullable

@@ -9,11 +9,15 @@ import {
   GetTaskGroupQueryParams,
   AddBlockBody,
   RenameTaskGroupBody,
+  PlaceTaskBody,
+  FocusTaskBody,
   UpdateTaskParams,
   UpdateTaskBody,
   DeleteTaskParams,
 } from "@workspace/api-zod";
 import { getEasternDateString } from "../lib/time";
+import { parseStoredLinks, serializeLinks } from "../lib/links";
+import { focusOpenGroup, lockSequence, nextAppendPosition, placeOpenGroup } from "../lib/sequence";
 
 const router = Router();
 
@@ -33,8 +37,11 @@ function resolveDateString(value?: string | Date): string {
 
 // Shapes a DB row into the API contract (timestamps as ISO strings).
 function serializeTask(t: typeof tasksTable.$inferSelect) {
+  const links = parseStoredLinks(t.link);
   return {
     ...t,
+    link: links[0] ?? null,
+    links,
     completedAt: t.completedAt ? t.completedAt.toISOString() : null,
     createdAt: t.createdAt.toISOString(),
   };
@@ -48,24 +55,29 @@ router.post("/tasks", async (req, res) => {
     return;
   }
 
-  const { name, chunks, date } = parsed.data;
+  const { name, chunks, date, description, links } = parsed.data;
   const dateStr = resolveDateString(date);
+  const note = description?.trim() || null;
+  const storedLinks = serializeLinks(links ?? []);
 
-  const insertValues = Array.from({ length: chunks }, (_, i) => ({
-    name,
-    date: dateStr,
-    chunkIndex: i + 1,
-    totalChunks: chunks,
-    completed: false,
-  }));
-
+  // Sequence lock first, then the name lock. New tasks append to Next.
   // Hold the name's advisory lock while inserting so this create is serialized
   // with the other name-domain writers (append/complete-focus/rename). Without
   // it, a concurrent create or rename targeting the same name could mint
   // duplicate chunk indices or merge two groups (there is no DB uniqueness
   // constraint on (name, date, chunkIndex)).
   const created = await db.transaction(async (tx) => {
+    await lockSequence(tx);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${name}))`);
+    const position = await nextAppendPosition(tx, "next");
+    const insertValues = Array.from({ length: chunks }, (_, i) => ({
+      name,
+      date: dateStr,
+      chunkIndex: i + 1,
+      totalChunks: chunks,
+      completed: false,
+      ...(i === 0 ? { description: note, link: storedLinks, horizon: "next" as const, position } : {}),
+    }));
     return tx.insert(tasksTable).values(insertValues).returning();
   });
 
@@ -150,21 +162,23 @@ router.get("/tasks/stats/today", async (_req, res) => {
 
   const totalBlocks = rows.length;
 
-  // Remaining planned blocks across ALL open task groups (any day), so the day
-  // budget reflects every pending block — not just the days the client has
-  // paged in. Aggregate per (name, date) group, mirroring the frontend's
-  // per-group clamp so over-estimated groups never subtract from the total.
+  // Remaining planned blocks across open Now and Next groups (any day). Later
+  // is parked, so it does not count toward the day. Aggregate per (name, date)
+  // group, mirroring the frontend's per-group clamp so over-estimated groups
+  // never subtract from the total. Horizon lives on the group's first block.
   const openPlannedRows = await db.execute(sql`
     SELECT COALESCE(SUM(GREATEST(0, total_chunks - completed_count)), 0)::int AS open_planned
     FROM (
       SELECT
         MAX(total_chunks) AS total_chunks,
         COUNT(*) FILTER (WHERE completed) AS completed_count,
-        COUNT(*) AS block_count
+        COUNT(*) AS block_count,
+        MAX(horizon) FILTER (WHERE chunk_index = 1) AS horizon
       FROM tasks
       GROUP BY name, date
     ) g
     WHERE g.completed_count < g.block_count
+      AND COALESCE(g.horizon, 'next') <> 'later'
   `);
   const openPlannedBlocks = Number(
     (openPlannedRows.rows[0] as { open_planned: number } | undefined)?.open_planned ?? 0,
@@ -282,6 +296,7 @@ router.put("/tasks/note", async (req, res) => {
   // insert two competing "first blocks" (read-then-insert race). The advisory
   // lock is released automatically when the transaction ends.
   const result = await db.transaction(async (tx) => {
+    await lockSequence(tx);
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${name}))`);
 
     const [first] = await tx
@@ -306,6 +321,7 @@ router.put("/tasks/note", async (req, res) => {
       return { taskId: null, description: null };
     }
 
+    const position = await nextAppendPosition(tx, "next");
     const [created] = await tx
       .insert(tasksTable)
       .values({
@@ -315,6 +331,8 @@ router.put("/tasks/note", async (req, res) => {
         totalChunks: 1,
         completed: false,
         description,
+        horizon: "next",
+        position,
       })
       .returning();
     return { taskId: created.id, description: created.description ?? null };
@@ -378,7 +396,8 @@ router.get("/tasks/group", async (req, res) => {
     totalEstimated,
     completedCount,
     description: first?.description ?? null,
-    link: first?.link ?? null,
+    link: parseStoredLinks(first?.link)[0] ?? null,
+    links: parseStoredLinks(first?.link),
     subtask: first?.subtask ?? null,
   });
 });
@@ -511,6 +530,60 @@ router.post("/tasks/rename", async (req, res) => {
   );
 });
 
+// GET /tasks/open — every block of every group that still has open work.
+router.get("/tasks/open", async (_req, res) => {
+  const tasks = await db
+    .select()
+    .from(tasksTable)
+    .where(
+      sql`(${tasksTable.name}, ${tasksTable.date}) IN (
+        SELECT name, date FROM tasks
+        GROUP BY name, date
+        HAVING COUNT(*) FILTER (WHERE NOT completed) > 0
+      )`,
+    )
+    .orderBy(asc(tasksTable.date), asc(tasksTable.name), asc(tasksTable.chunkIndex));
+
+  res.json({ tasks: tasks.map(serializeTask) });
+});
+
+// POST /tasks/place — move an open group within Now / Next / Later.
+router.post("/tasks/place", async (req, res) => {
+  const parsed = PlaceTaskBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+
+  const { name, date, horizon, index } = parsed.data;
+  const updated = await db.transaction(async (tx) =>
+    placeOpenGroup(tx, { name, date, horizon, index }),
+  );
+
+  if (!updated) {
+    res.status(404).json({ error: "Task not found" });
+    return;
+  }
+
+  res.json(serializeTask(updated));
+});
+
+// POST /tasks/focus — the task a focus block just started becomes Now.
+router.post("/tasks/focus", async (req, res) => {
+  const parsed = FocusTaskBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+
+  const today = getEasternDateString();
+  const updated = await db.transaction(async (tx) =>
+    focusOpenGroup(tx, { name: parsed.data.name, date: parsed.data.date }, today),
+  );
+
+  res.json({ placed: updated !== null });
+});
+
 // PATCH /tasks/:id
 router.patch("/tasks/:id", async (req, res) => {
   const paramsParsed = UpdateTaskParams.safeParse(req.params);
@@ -543,8 +616,10 @@ router.patch("/tasks/:id", async (req, res) => {
   if (bodyParsed.data.description !== undefined) {
     updates.description = bodyParsed.data.description.trim() || null;
   }
-  if (bodyParsed.data.link !== undefined) {
-    updates.link = bodyParsed.data.link.trim() || null;
+  if (bodyParsed.data.links !== undefined) {
+    updates.link = serializeLinks(bodyParsed.data.links);
+  } else if (bodyParsed.data.link !== undefined) {
+    updates.link = serializeLinks(bodyParsed.data.link.trim() ? [bodyParsed.data.link] : []);
   }
   // Empty string clears the current sub-focus (stored as null).
   if (bodyParsed.data.subtask !== undefined) {

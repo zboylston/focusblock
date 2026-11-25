@@ -10,12 +10,19 @@ export const tasksTable = pgTable("tasks", {
   totalChunks: integer("total_chunks").notNull().default(1),
   completed: boolean("completed").notNull().default(false),
   plays: integer("plays").notNull().default(0),
-  // Task-group metadata (planner note + reference link + current sub-focus).
+  // Task-group metadata (planner note + reference links + current sub-focus).
   // Stored on the first block (chunkIndex 1) of a group, like `plays`.
+  // `link` holds one URL, or a JSON array when the group has several.
   description: text("description"),
   link: text("link"),
   // Short single-line "what I'm working on right now" marker within the group.
   subtask: text("subtask"),
+  // Remembered sequence for open work. Stored on the first block of a group,
+  // like description/link/plays. `now` is the single current task, `next` is
+  // the ordered queue, `later` is parked. `position` is the order within a
+  // horizon (lower comes first).
+  horizon: text("horizon").notNull().default("next"),
+  position: integer("position").notNull().default(0),
   // Completion metadata. A block becomes "done" either when its focus timer
   // finishes or when it is checked off manually; rating/notes are optional and
   // only attached via the rating step after a timer completion.

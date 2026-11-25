@@ -5,6 +5,7 @@
  * FocusBlock API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { TaskHorizon } from './taskHorizon';
 
 export interface Task {
   id: number;
@@ -22,15 +23,21 @@ export interface Task {
      */
   description?: string | null;
   /**
-     * Reference URL attached to the task group
+     * First reference URL attached to the task group
      * @nullable
      */
   link?: string | null;
+  /** Reference URLs attached to the task group (stored on the first block) */
+  links?: string[];
   /**
      * Current sub-focus within the task group (stored on the first block)
      * @nullable
      */
   subtask?: string | null;
+  /** Where this task sits in the open sequence. Stored on the first block of the group. */
+  horizon: TaskHorizon;
+  /** Order within the horizon. Lower comes first. Stored on the first block of the group. */
+  position: number;
   /**
      * Emoji rating: 😩 | 😐 | 🙂 | 🔥
      * @nullable

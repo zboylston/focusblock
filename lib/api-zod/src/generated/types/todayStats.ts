@@ -9,6 +9,6 @@
 export interface TodayStats {
   totalBlocks: number;
   totalMinutes: number;
-  /** Remaining planned focus blocks across all open task groups (any day), clamped per group so over-estimated groups never go negative. */
+  /** Remaining planned focus blocks across open Now and Next groups (any day). Later is parked and does not count. Clamped per group so over-estimated groups never go negative. */
   openPlannedBlocks: number;
 }
